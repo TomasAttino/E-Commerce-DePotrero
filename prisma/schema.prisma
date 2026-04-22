@@ -1,0 +1,33 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Team {
+  id       String    @id @default(cuid())
+  name     String
+  slug     String    @unique
+  banner   String
+  products Product[]
+}
+
+model Product {
+  id       String   @id @default(cuid())
+  name     String
+  price    Float
+  image    String
+  sizes    String // Se guardará como JSON string o similar en SQLite si no usamos una tabla aparte, pero para simplificar...
+  colors   String
+  category String
+  teamId   String
+  team     Team     @relation(fields: [teamId], references: [id])
+}
