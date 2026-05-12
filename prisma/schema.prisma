@@ -9,7 +9,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model Team {
@@ -21,13 +21,15 @@ model Team {
 }
 
 model Product {
-  id       String   @id @default(cuid())
-  name     String
-  price    Float
-  image    String
-  sizes    String // Se guardará como JSON string o similar en SQLite si no usamos una tabla aparte, pero para simplificar...
-  colors   String
-  category String
-  teamId   String
-  team     Team     @relation(fields: [teamId], references: [id])
+  id         String   @id @default(cuid())
+  name       String
+  price      Float
+  image      String
+  hoverImage String?
+  sizes      String
+  colors     String
+  category   String
+  inStock    Boolean  @default(true)
+  teamId     String
+  team       Team     @relation(fields: [teamId], references: [id])
 }

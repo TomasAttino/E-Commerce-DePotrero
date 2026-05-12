@@ -1,39 +1,19 @@
-"use client";
+import { getTeams } from "./actions/products";
+import HomeContent from "@/components/HomeContent";
 
-import { useState } from "react";
-import Header from "@/components/Header";
-import Hero from "@/components/Hero";
-import TeamSection from "@/components/TeamSection";
-import CartDrawer from "@/components/CartDrawer";
-import { TEAMS } from "@/data/mock";
+export default async function Home() {
+  const teamsRaw = await getTeams();
+  
+  // Mapear los datos para que coincidan con la estructura que espera el frontend
+  // (especialmente parsear los JSON strings de sizes y colors)
+  const teams = teamsRaw.map(team => ({
+    ...team,
+    products: team.products.map(product => ({
+      ...product,
+      sizes: JSON.parse(product.sizes),
+      colors: JSON.parse(product.colors),
+    }))
+  }));
 
-export default function Home() {
-  const [isCartOpen, setIsCartOpen] = useState(false);
-
-  return (
-    <main className="bg-black text-white selection:bg-white selection:text-black">
-      <Header onCartClick={() => setIsCartOpen(true)} />
-      
-      <Hero />
-      
-      <div className="space-y-0">
-        {TEAMS.map(team => (
-          <TeamSection key={team.id} team={team} />
-        ))}
-      </div>
-
-      <footer className="py-20 border-t border-white/10 text-center">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-2xl font-black italic tracking-tighter mb-8">CAMISETAS</div>
-          <p className="text-zinc-500 text-sm max-w-md mx-auto">
-            © 2024 Camisetas. Todos los derechos reservados.
-            <br />
-            Envíos a todo el país coordinados vía WhatsApp.
-          </p>
-        </div>
-      </footer>
-
-      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
-    </main>
-  );
+  return <HomeContent teams={teams} />;
 }
