@@ -2,6 +2,8 @@ import { getTeams } from "../actions/products";
 import Link from "next/link";
 import Image from "next/image";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminPage() {
   const teams = await getTeams();
 
