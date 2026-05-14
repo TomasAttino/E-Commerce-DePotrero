@@ -11,13 +11,13 @@ export default async function AdminPage() {
         <h1 className="text-3xl font-black">Dashboard</h1>
         <div className="space-x-4">
           <Link 
-            href="/admin/teams/new" 
+            href="/panel-privado-camisetas/teams/new" 
             className="border border-white text-white px-4 py-2 font-bold hover:bg-white hover:text-black transition-colors"
           >
             Nuevo Equipo
           </Link>
           <Link 
-            href="/admin/products/new" 
+            href="/panel-privado-camisetas/products/new" 
             className="bg-white text-black px-4 py-2 font-bold hover:bg-zinc-200 transition-colors"
           >
             Nuevo Producto
@@ -42,7 +42,7 @@ export default async function AdminPage() {
               <div className="absolute inset-0 flex items-center justify-center group/banner">
                 <h2 className="text-xl font-bold uppercase tracking-tighter">{team.name}</h2>
                 <Link 
-                  href={`/admin/teams/${team.id}`}
+                  href={`/panel-privado-camisetas/teams/${team.id}`}
                   className="absolute bottom-2 right-2 opacity-0 group-hover/banner:opacity-100 bg-white/10 hover:bg-white/20 text-[10px] px-2 py-1 rounded transition-all"
                 >
                   Editar Equipo
@@ -52,10 +52,10 @@ export default async function AdminPage() {
             <div className="p-4">
               <h3 className="text-sm font-semibold text-zinc-400 mb-4">{team.products.length} Productos</h3>
               <div className="space-y-2">
-                {team.products.map((product) => (
+                {team.products.slice(0, 5).map((product) => (
                   <Link 
                     key={product.id} 
-                    href={`/admin/products/${product.id}`}
+                    href={`/panel-privado-camisetas/products/${product.id}`}
                     className="flex items-center justify-between group hover:bg-white/5 p-1 rounded transition-colors"
                   >
                     <span className="text-sm truncate mr-2">{product.name}</span>
@@ -67,6 +67,13 @@ export default async function AdminPage() {
                     </div>
                   </Link>
                 ))}
+                {team.products.length > 5 && (
+                  <div className="text-center pt-2">
+                    <p className="text-[10px] text-zinc-600 uppercase font-bold italic">
+                      + {team.products.length - 5} productos más
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

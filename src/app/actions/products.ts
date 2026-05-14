@@ -41,7 +41,7 @@ export async function createTeam(formData: FormData) {
   });
 
   revalidatePath("/");
-  revalidatePath("/admin");
+  revalidatePath("/panel-privado-camisetas");
   return team;
 }
 
@@ -73,7 +73,7 @@ export async function updateTeam(id: string, formData: FormData) {
   });
 
   revalidatePath("/");
-  revalidatePath("/admin");
+  revalidatePath("/panel-privado-camisetas");
   return team;
 }
 
@@ -88,7 +88,7 @@ export async function deleteTeam(id: string) {
   });
   
   revalidatePath("/");
-  revalidatePath("/admin");
+  revalidatePath("/panel-privado-camisetas");
 }
 
 export async function getProductById(id: string) {
@@ -150,7 +150,7 @@ export async function createProduct(formData: FormData) {
   });
 
   revalidatePath("/");
-  revalidatePath("/admin");
+  revalidatePath("/panel-privado-camisetas");
   return product;
 }
 
@@ -204,7 +204,7 @@ export async function updateProduct(id: string, formData: FormData) {
   });
 
   revalidatePath("/");
-  revalidatePath("/admin");
+  revalidatePath("/panel-privado-camisetas");
   return product;
 }
 
@@ -215,5 +215,5 @@ export async function deleteProduct(id: string) {
     where: { id },
   });
   revalidatePath("/");
-  revalidatePath("/admin");
+  revalidatePath("/panel-privado-camisetas");
 }

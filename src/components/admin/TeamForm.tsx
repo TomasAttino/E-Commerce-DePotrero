@@ -19,7 +19,7 @@ export default function TeamForm({ initialData }: { initialData?: Team }) {
     if (initialData && confirm("¿Estás seguro de que quieres eliminar este equipo? Esto borrará también todos sus productos.")) {
       setLoading(true);
       await deleteTeam(initialData.id);
-      router.push("/admin");
+      router.push("/panel-privado-camisetas");
       router.refresh();
     }
   }
@@ -35,7 +35,7 @@ export default function TeamForm({ initialData }: { initialData?: Team }) {
       } else {
         await createTeam(formData);
       }
-      router.push("/admin");
+      router.push("/panel-privado-camisetas");
       router.refresh();
     } catch (error) {
       console.error(error);

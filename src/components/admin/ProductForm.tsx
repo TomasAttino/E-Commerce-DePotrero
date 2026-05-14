@@ -30,7 +30,7 @@ export default function ProductForm({ teams, initialData }: { teams: Team[], ini
     if (initialData && confirm("¿Estás seguro de que quieres eliminar este producto?")) {
       setLoading(true);
       await deleteProduct(initialData.id);
-      router.push("/admin");
+      router.push("/panel-privado-camisetas");
       router.refresh();
     }
   }
@@ -46,7 +46,7 @@ export default function ProductForm({ teams, initialData }: { teams: Team[], ini
       } else {
         await createProduct(formData);
       }
-      router.push("/admin");
+      router.push("/panel-privado-camisetas");
       router.refresh();
     } catch (error) {
       console.error(error);
