@@ -2,9 +2,12 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import fs from "fs/promises";
-import path from "path";
 
+async function fileToBase64(file: File): Promise<string> {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const mimeType = file.type;
+  return `data:${mimeType};base64,${buffer.toString("base64")}`;
+}
 
 export async function getTeams() {
   return await prisma.team.findMany({
@@ -25,11 +28,7 @@ export async function createTeam(formData: FormData) {
   let bannerUrl = "";
 
   if (bannerFile && bannerFile.size > 0) {
-    const buffer = Buffer.from(await bannerFile.arrayBuffer());
-    const fileName = `${Date.now()}-${bannerFile.name}`;
-    const filePath = path.join(process.cwd(), "public", "uploads", fileName);
-    await fs.writeFile(filePath, buffer);
-    bannerUrl = `/uploads/${fileName}`;
+    bannerUrl = await fileToBase64(bannerFile);
   }
 
   const team = await prisma.team.create({
@@ -50,21 +49,13 @@ export async function updateTeam(id: string, formData: FormData) {
   const slug = formData.get("slug") as string;
   const bannerFile = formData.get("banner") as File;
 
-  const updateData: {
-    name: string;
-    slug: string;
-    banner?: string;
-  } = {
+  const updateData: any = {
     name,
     slug,
   };
 
   if (bannerFile && bannerFile.size > 0) {
-    const buffer = Buffer.from(await bannerFile.arrayBuffer());
-    const fileName = `${Date.now()}-${bannerFile.name}`;
-    const filePath = path.join(process.cwd(), "public", "uploads", fileName);
-    await fs.writeFile(filePath, buffer);
-    updateData.banner = `/uploads/${fileName}`;
+    updateData.banner = await fileToBase64(bannerFile);
   }
 
   const team = await prisma.team.update({
@@ -78,7 +69,6 @@ export async function updateTeam(id: string, formData: FormData) {
 }
 
 export async function deleteTeam(id: string) {
-  // Primero borrar productos del equipo para evitar errores de FK si no está en cascade
   await prisma.product.deleteMany({
     where: { teamId: id }
   });
@@ -118,21 +108,11 @@ export async function createProduct(formData: FormData) {
   let hoverImageUrl = "";
 
   if (imageFile && imageFile.size > 0) {
-    const buffer = Buffer.from(await imageFile.arrayBuffer());
-    const fileName = `${Date.now()}-primary-${imageFile.name}`;
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
-    await fs.mkdir(uploadDir, { recursive: true });
-    const filePath = path.join(uploadDir, fileName);
-    await fs.writeFile(filePath, buffer);
-    imageUrl = `/uploads/${fileName}`;
+    imageUrl = await fileToBase64(imageFile);
   }
 
   if (hoverImageFile && hoverImageFile.size > 0) {
-    const buffer = Buffer.from(await hoverImageFile.arrayBuffer());
-    const fileName = `${Date.now()}-hover-${hoverImageFile.name}`;
-    const filePath = path.join(process.cwd(), "public", "uploads", fileName);
-    await fs.writeFile(filePath, buffer);
-    hoverImageUrl = `/uploads/${fileName}`;
+    hoverImageUrl = await fileToBase64(hoverImageFile);
   }
 
   const product = await prisma.product.create({
@@ -164,16 +144,7 @@ export async function updateProduct(id: string, formData: FormData) {
   const imageFile = formData.get("image") as File;
   const hoverImageFile = formData.get("hoverImage") as File;
 
-  const updateData: {
-    name: string;
-    price: number;
-    category: string;
-    sizes: string;
-    colors: string;
-    inStock: boolean;
-    image?: string;
-    hoverImage?: string | null;
-  } = {
+  const updateData: any = {
     name,
     price,
     category,
@@ -183,19 +154,11 @@ export async function updateProduct(id: string, formData: FormData) {
   };
 
   if (imageFile && imageFile.size > 0) {
-    const buffer = Buffer.from(await imageFile.arrayBuffer());
-    const fileName = `${Date.now()}-primary-${imageFile.name}`;
-    const filePath = path.join(process.cwd(), "public", "uploads", fileName);
-    await fs.writeFile(filePath, buffer);
-    updateData.image = `/uploads/${fileName}`;
+    updateData.image = await fileToBase64(imageFile);
   }
 
   if (hoverImageFile && hoverImageFile.size > 0) {
-    const buffer = Buffer.from(await hoverImageFile.arrayBuffer());
-    const fileName = `${Date.now()}-hover-${hoverImageFile.name}`;
-    const filePath = path.join(process.cwd(), "public", "uploads", fileName);
-    await fs.writeFile(filePath, buffer);
-    updateData.hoverImage = `/uploads/${fileName}`;
+    updateData.hoverImage = await fileToBase64(hoverImageFile);
   }
 
   const product = await prisma.product.update({
@@ -207,8 +170,6 @@ export async function updateProduct(id: string, formData: FormData) {
   revalidatePath("/panel-privado-camisetas");
   return product;
 }
-
-
 
 export async function deleteProduct(id: string) {
   await prisma.product.delete({

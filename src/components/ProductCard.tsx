@@ -43,19 +43,32 @@ export default function ProductCard({ product }: { product: Product }) {
       </div>
       
       <div className="p-4 space-y-4">
-        <div>
-          <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-widest">{product.category}</h3>
-          <h2 className="text-lg font-bold truncate">{product.name}</h2>
-          <p className="text-xl font-black mt-1">${product.price.toLocaleString('es-AR')}</p>
+        <div className="flex justify-between items-start">
+          <div className="flex-1 min-w-0 mr-2">
+            <h3 className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest">{product.category}</h3>
+            <h2 className="text-base font-bold truncate uppercase tracking-tighter">{product.name}</h2>
+            <p className="text-xl font-black mt-1">${product.price.toLocaleString('es-AR')}</p>
+          </div>
+          <button 
+            onClick={() => addToCart(product, selectedSize, selectedColor)}
+            disabled={!product.inStock}
+            className={`px-4 py-2 text-[11px] font-black uppercase tracking-tighter transition-all ${
+              product.inStock 
+              ? 'bg-white text-black hover:bg-zinc-200' 
+              : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+            }`}
+          >
+            {product.inStock ? 'Comprar' : 'Agotado'}
+          </button>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1">
           {product.sizes.map(size => (
             <button
               key={size}
               onClick={() => setSelectedSize(size)}
-              className={`text-[10px] w-8 h-8 flex items-center justify-center border transition-colors ${
-                selectedSize === size ? 'border-white bg-white text-black' : 'border-white/20 text-white/50 hover:border-white/50'
+              className={`text-[9px] w-7 h-7 flex items-center justify-center border transition-colors ${
+                selectedSize === size ? 'border-white bg-white text-black' : 'border-white/10 text-white/40 hover:border-white/30'
               }`}
             >
               {size}
