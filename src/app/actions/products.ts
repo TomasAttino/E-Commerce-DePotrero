@@ -2,12 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-
-async function fileToBase64(file: File): Promise<string> {
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const mimeType = file.type;
-  return `data:${mimeType};base64,${buffer.toString("base64")}`;
-}
+import { put } from "@vercel/blob";
 
 export async function getTeams() {
   return await prisma.team.findMany({
@@ -28,7 +23,10 @@ export async function createTeam(formData: FormData) {
   let bannerUrl = "";
 
   if (bannerFile && bannerFile.size > 0) {
-    bannerUrl = await fileToBase64(bannerFile);
+    const blob = await put(bannerFile.name, bannerFile, {
+      access: 'public',
+    });
+    bannerUrl = blob.url;
   }
 
   const team = await prisma.team.create({
@@ -55,7 +53,10 @@ export async function updateTeam(id: string, formData: FormData) {
   };
 
   if (bannerFile && bannerFile.size > 0) {
-    updateData.banner = await fileToBase64(bannerFile);
+    const blob = await put(bannerFile.name, bannerFile, {
+      access: 'public',
+    });
+    updateData.banner = blob.url;
   }
 
   const team = await prisma.team.update({
@@ -108,11 +109,17 @@ export async function createProduct(formData: FormData) {
   let hoverImageUrl = "";
 
   if (imageFile && imageFile.size > 0) {
-    imageUrl = await fileToBase64(imageFile);
+    const blob = await put(imageFile.name, imageFile, {
+      access: 'public',
+    });
+    imageUrl = blob.url;
   }
 
   if (hoverImageFile && hoverImageFile.size > 0) {
-    hoverImageUrl = await fileToBase64(hoverImageFile);
+    const blob = await put(hoverImageFile.name, hoverImageFile, {
+      access: 'public',
+    });
+    hoverImageUrl = blob.url;
   }
 
   const product = await prisma.product.create({
@@ -154,11 +161,17 @@ export async function updateProduct(id: string, formData: FormData) {
   };
 
   if (imageFile && imageFile.size > 0) {
-    updateData.image = await fileToBase64(imageFile);
+    const blob = await put(imageFile.name, imageFile, {
+      access: 'public',
+    });
+    updateData.image = blob.url;
   }
 
   if (hoverImageFile && hoverImageFile.size > 0) {
-    updateData.hoverImage = await fileToBase64(hoverImageFile);
+    const blob = await put(hoverImageFile.name, hoverImageFile, {
+      access: 'public',
+    });
+    updateData.hoverImage = blob.url;
   }
 
   const product = await prisma.product.update({
