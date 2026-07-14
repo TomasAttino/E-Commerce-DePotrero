@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Product } from "@/data/mock";
+import { Product } from "../../public/camisetas/mock"; // O la ruta correcta a tu mock
 import { useCart } from "@/context/CartContext";
 import { Plus } from "lucide-react";
 
 export default function ProductCard({ product }: { product: Product }) {
   const { addToCart } = useCart();
   const [selectedSize, setSelectedSize] = useState(product.sizes[0]);
-  const [selectedColor] = useState(product.colors[0]);
   const [isHovered, setIsHovered] = useState(false);
 
   return (
@@ -31,7 +30,8 @@ export default function ProductCard({ product }: { product: Product }) {
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
           {product.inStock ? (
             <button 
-              onClick={() => addToCart(product, selectedSize, selectedColor)}
+              // Le sacamos el selectedColor de acá
+              onClick={() => addToCart(product, selectedSize)}
               className="bg-white text-black p-4 rounded-full transform translate-y-4 group-hover/card:translate-y-0 transition-all duration-300"
             >
               <Plus size={24} />
@@ -50,7 +50,8 @@ export default function ProductCard({ product }: { product: Product }) {
             <p className="text-xl font-black mt-1">${product.price.toLocaleString('es-AR')}</p>
           </div>
           <button 
-            onClick={() => addToCart(product, selectedSize, selectedColor)}
+            // Y le sacamos el selectedColor de acá también
+            onClick={() => addToCart(product, selectedSize)}
             disabled={!product.inStock}
             className={`px-4 py-2 text-[11px] font-black uppercase tracking-tighter transition-all ${
               product.inStock 

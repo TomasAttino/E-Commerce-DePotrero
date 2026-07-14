@@ -1,5 +1,5 @@
 import { PrismaClient } from "../src/generated/prisma";
-import { TEAMS } from "../src/data/mock";
+import { TEAMS } from "../public/camisetas/mock";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 import "dotenv/config";

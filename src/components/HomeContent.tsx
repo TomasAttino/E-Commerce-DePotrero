@@ -12,15 +12,16 @@ interface Product {
   price: number;
   image: string;
   sizes: string[];
-  colors: string[];
   category: string;
+  inStock: boolean;
 }
 
 interface Team {
   id: string;
   name: string;
   slug: string;
-  banner: string;
+  bannerMobile: string;
+  bannerDesktop: string;
   products: Product[];
 }
 
