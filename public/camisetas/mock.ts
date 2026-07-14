@@ -17,7 +17,6 @@ export interface Team {
   bannerMobile: string; 
   products: Product[];
 }
-//Todas las camisetas de las carpetas se encuentran aca 
 export const teamsMock: Team[] = [
   {
     id: "boca",
