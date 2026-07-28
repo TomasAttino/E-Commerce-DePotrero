@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
+    formats: ['image/avif', 'image/webp'],
+    qualities: [75, 85],
+    localPatterns: [
+      { pathname: '/camisetas/**' },
+    ],
     remotePatterns: [
       { protocol: 'https', hostname: 'i.pinimg.com' },
       { protocol: 'https', hostname: 'images.unsplash.com' },

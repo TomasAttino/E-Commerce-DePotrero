@@ -1,10 +1,17 @@
+import Image from "next/image";
+
 export default function Hero() {
   return (
     <section id="hero" className="relative h-screen flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black z-10" />
-      <div 
-        className="absolute inset-0 bg-cover bg-center scale-105 opacity-60" 
-        style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&q=80&w=2000")' }}
+      <Image
+        src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&q=80&w=2000"
+        alt=""
+        fill
+        sizes="100vw"
+        quality={85}
+        preload
+        className="object-cover object-center scale-105 opacity-60"
       />
       
       <div className="relative z-20 text-center space-y-6 px-4">

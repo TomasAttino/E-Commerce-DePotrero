@@ -1,6 +1,7 @@
 "use client";
 
 import { Team } from "../../public/camisetas/mock";
+import Image from "next/image";
 import ProductCard from "./ProductCard";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRef } from "react";
@@ -29,16 +30,30 @@ export default function TeamSection({ team }: { team: Team }) {
       <div className="relative h-[250px] sm:h-[300px] md:h-[400px] mb-8 md:mb-12 overflow-hidden border-b border-white/10">
         
         {/* Foto para Celular */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 hover:scale-105 md:hidden"
-          style={{ backgroundImage: `url(${team.bannerMobile})` }}
-        />
+        <div className="absolute inset-0 transition-transform duration-1000 hover:scale-105 md:hidden">
+          <Image
+            src={team.bannerMobile}
+            alt=""
+            fill
+            sizes="100vw"
+            quality={85}
+            loading="lazy"
+            className="object-cover object-center"
+          />
+        </div>
         
         {/* Foto para PC */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 hover:scale-105 hidden md:block"
-          style={{ backgroundImage: `url(${team.bannerDesktop})` }}
-        />
+        <div className="absolute inset-0 transition-transform duration-1000 hover:scale-105 hidden md:block">
+          <Image
+            src={team.bannerDesktop}
+            alt=""
+            fill
+            sizes="100vw"
+            quality={85}
+            loading="lazy"
+            className="object-cover object-center"
+          />
+        </div>
         
         {/* Degradado y Título */}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex items-center justify-center">

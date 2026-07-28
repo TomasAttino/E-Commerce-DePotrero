@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Product } from "../../public/camisetas/mock"; // O la ruta correcta a tu mock
 import { useCart } from "@/context/CartContext";
 import { Plus } from "lucide-react";
@@ -17,10 +18,14 @@ export default function ProductCard({ product }: { product: Product }) {
       className={`flex-none w-[280px] md:w-[320px] bg-zinc-900/50 group/card border border-white/5 overflow-hidden transition-opacity ${!product.inStock ? 'opacity-60' : ''}`}
     >
       <div className="relative aspect-[4/5] overflow-hidden bg-transparent">
-        <img 
-          src={(isHovered && product.hoverImage) ? product.hoverImage : product.image} 
+        <Image
+          src={(isHovered && product.hoverImage) ? product.hoverImage : product.image}
           alt={product.name}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-110"
+          fill
+          sizes="(max-width: 767px) 280px, 320px"
+          quality={85}
+          loading="lazy"
+          className="object-cover transition-transform duration-500 group-hover/card:scale-110"
         />
         {!product.inStock && (
           <div className="absolute top-4 right-4 bg-red-600 text-white text-[10px] font-black px-2 py-1 uppercase tracking-tighter">
