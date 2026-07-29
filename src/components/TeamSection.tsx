@@ -24,7 +24,7 @@ export default function TeamSection({ team }: { team: Team }) {
   };
 
   return (
-    <section id={team.slug} className="py-12 md:py-20">
+    <section id={team.slug} className="scroll-mt-[98px] py-12 md:py-20">
       
       {/* 1. BLOQUE DEL BANNER (Separado del resto) */}
       <div className="relative h-[250px] sm:h-[300px] md:h-[400px] mb-8 md:mb-12 overflow-hidden border-b border-white/10">

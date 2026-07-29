@@ -18,7 +18,15 @@ type Team = {
   products: Product[];
 };
 
-export default function DashboardContent({ initialTeams }: { initialTeams: Team[] }) {
+type Lead = {
+  id: string;
+  name: string;
+  email: string;
+  team: string;
+  createdAt: Date;
+};
+
+export default function DashboardContent({ initialTeams, leads }: { initialTeams: Team[]; leads: Lead[] }) {
   const [searchTerm, setSearchTerm] = useState("");
 
   const filteredTeams = initialTeams.map(team => ({
@@ -105,6 +113,31 @@ export default function DashboardContent({ initialTeams }: { initialTeams: Team[
           </div>
         ))}
       </div>
+
+      <section className="border border-white/10 bg-zinc-900 p-5">
+        <h2 className="mb-5 text-xl font-black uppercase tracking-tight">Leads de primera compra</h2>
+        {leads.length === 0 ? (
+          <p className="text-sm text-zinc-500">Todavía no hay leads registrados.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[620px] text-left text-sm">
+              <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-zinc-500">
+                <tr><th className="pb-3 pr-4">Nombre</th><th className="pb-3 pr-4">Email</th><th className="pb-3 pr-4">Equipo</th><th className="pb-3">Fecha</th></tr>
+              </thead>
+              <tbody>
+                {leads.map((lead) => (
+                  <tr key={lead.id} className="border-b border-white/5 last:border-0">
+                    <td className="py-3 pr-4">{lead.name}</td>
+                    <td className="py-3 pr-4 text-zinc-300">{lead.email}</td>
+                    <td className="py-3 pr-4">{lead.team}</td>
+                    <td className="py-3 text-zinc-400">{new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeStyle: "short" }).format(lead.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

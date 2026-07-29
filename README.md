@@ -16,6 +16,16 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Private panel configuration
+
+Set `ADMIN_PASSWORD` in the server environment before using `/panel-privado-camisetas/login`. The value is read only on the server; the panel remains inaccessible when it is not configured. Do not commit real credentials.
+
+## Deployment and migrations
+
+Production deployments must provide `DATABASE_URL` and use the `vercel-build` script (Vercel detects this script automatically) or configure the platform build command as `npm run vercel-build`. It runs `prisma migrate deploy` before the regular build, applying only pending migrations without resetting or deleting existing data. Keep `npm run build` for local/CI builds that do not have a database connection.
+
+The login page is rendered at request time so changes to `ADMIN_PASSWORD` are evaluated by the running server, not during the build. Login attempts are limited in process memory to five attempts per client key every 15 minutes. This limiter is best-effort on serverless or multi-instance deployments because each instance has separate memory; use an external shared limiter for stronger distributed protection.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

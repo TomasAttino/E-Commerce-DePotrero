@@ -2,7 +2,7 @@ import Image from "next/image";
 
 export default function Hero() {
   return (
-    <section id="hero" className="relative h-screen flex items-center justify-center overflow-hidden">
+    <section id="hero" className="relative h-screen scroll-mt-[98px] flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black z-10" />
       <Image
         src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&q=80&w=2000"

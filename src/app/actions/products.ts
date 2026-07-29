@@ -1,10 +1,13 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma";
 import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function getTeams() {
+  await requireAdmin();
   return await prisma.team.findMany({
     include: {
       products: true,
@@ -16,6 +19,7 @@ export async function getTeams() {
 }
 
 export async function createTeam(formData: FormData) {
+  await requireAdmin();
   const name = formData.get("name") as string;
   const slug = formData.get("slug") as string;
   const bannerFile = formData.get("banner") as File;
@@ -43,11 +47,12 @@ export async function createTeam(formData: FormData) {
 }
 
 export async function updateTeam(id: string, formData: FormData) {
+  await requireAdmin();
   const name = formData.get("name") as string;
   const slug = formData.get("slug") as string;
   const bannerFile = formData.get("banner") as File;
 
-  const updateData: any = {
+  const updateData: Prisma.TeamUpdateInput = {
     name,
     slug,
   };
@@ -70,31 +75,33 @@ export async function updateTeam(id: string, formData: FormData) {
 }
 
 export async function deleteTeam(id: string) {
-  await prisma.product.deleteMany({
-    where: { teamId: id }
-  });
-  
-  await prisma.team.delete({
-    where: { id },
-  });
-  
+  await requireAdmin();
+
+  await prisma.$transaction([
+    prisma.product.deleteMany({ where: { teamId: id } }),
+    prisma.team.delete({ where: { id } }),
+  ]);
+
   revalidatePath("/");
   revalidatePath("/panel-privado-camisetas");
 }
 
 export async function getProductById(id: string) {
+  await requireAdmin();
   return await prisma.product.findUnique({
     where: { id },
   });
 }
 
 export async function getTeamById(id: string) {
+  await requireAdmin();
   return await prisma.team.findUnique({
     where: { id },
   });
 }
 
 export async function createProduct(formData: FormData) {
+  await requireAdmin();
   const name = formData.get("name") as string;
   const price = parseFloat(formData.get("price") as string);
   const category = formData.get("category") as string;
@@ -142,6 +149,7 @@ export async function createProduct(formData: FormData) {
 }
 
 export async function updateProduct(id: string, formData: FormData) {
+  await requireAdmin();
   const name = formData.get("name") as string;
   const price = parseFloat(formData.get("price") as string);
   const category = formData.get("category") as string;
@@ -151,7 +159,7 @@ export async function updateProduct(id: string, formData: FormData) {
   const imageFile = formData.get("image") as File;
   const hoverImageFile = formData.get("hoverImage") as File;
 
-  const updateData: any = {
+  const updateData: Prisma.ProductUpdateInput = {
     name,
     price,
     category,
@@ -185,6 +193,7 @@ export async function updateProduct(id: string, formData: FormData) {
 }
 
 export async function deleteProduct(id: string) {
+  await requireAdmin();
   await prisma.product.delete({
     where: { id },
   });

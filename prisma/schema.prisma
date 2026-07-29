@@ -28,3 +28,11 @@ model Product {
   teamId     String
   team       Team    @relation(fields: [teamId], references: [id])
 }
+
+model Lead {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  team      String
+  createdAt DateTime @default(now())
+}

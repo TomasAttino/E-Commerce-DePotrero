@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { logoutAdmin } from "@/app/actions/auth";
 
 export default function AdminLayout({
   children,
@@ -12,10 +13,15 @@ export default function AdminLayout({
           <Link href="/panel-privado-camisetas" className="text-xl font-bold italic tracking-tighter">
             DASHBOARD PRIVADO
           </Link>
-          <div className="space-x-4">
+            <div className="space-x-4">
             <Link href="/" className="text-sm text-zinc-400 hover:text-white transition-colors">
               Ir a la web
             </Link>
+            <form action={logoutAdmin} className="inline">
+              <button type="submit" className="text-sm text-zinc-400 transition-colors hover:text-white">
+                Log out
+              </button>
+            </form>
           </div>
         </div>
       </nav>
