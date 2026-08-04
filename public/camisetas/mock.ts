@@ -1,6 +1,7 @@
 export interface Product {
   id: string;
   name: string;
+  year?: string;
   price: number;
   image: string;
   hoverImage?: string;

@@ -24,6 +24,7 @@ const withTeam = addCatalogTeam(initial, {
 const newProduct = {
   id: "nuevo-equipo-1",
   name: "Buzo Inicial",
+  year: "2025/26",
   price: 30000,
   image: "https://example.com/buzo.png",
   sizes: ["M", "L"],
@@ -31,12 +32,13 @@ const newProduct = {
   inStock: true,
 };
 const withProduct = addCatalogProduct(withTeam, "nuevo-equipo", newProduct);
-const edited = updateCatalogProduct(withProduct, newProduct.id, { name: "Buzo Editado", price: 35000, teamId: "boca" });
+const edited = updateCatalogProduct(withProduct, newProduct.id, { name: "Buzo Editado", year: "2026", price: 35000, teamId: "boca" });
 assert.equal(edited.teams.find((team) => team.id === "boca")?.products.some((product) => product.id === newProduct.id), true);
 assert.equal(filterCatalogProducts(edited, "editado", "boca").length, 1);
 assert.equal(paginate(Array.from({ length: 25 }, (_, index) => index), 2).items.length, 1);
 
 const product = edited.teams.find((team) => team.id === "boca")!.products.find((item) => item.id === newProduct.id)!;
+assert.equal(product.year, "2026");
 const stock = toggleProductSize(emptyStockState(), product, "M");
 assert.deepEqual(resolveProductStock(product, stock).availableSizes, ["L"]);
 

@@ -38,7 +38,7 @@ export function findCatalogTeam(state: CatalogState, teamId: string) {
 export function updateCatalogProduct(
   state: CatalogState,
   productId: string,
-  update: Partial<Pick<Product, "name" | "price" | "category" | "image" | "hoverImage" | "sizes">> & { teamId?: string },
+  update: Partial<Pick<Product, "name" | "year" | "price" | "category" | "image" | "hoverImage" | "sizes">> & { teamId?: string },
 ): CatalogState {
   const current = flattenCatalog(state).find(({ product }) => product.id === productId);
   if (!current) throw new Error("El producto no existe en el catálogo público.");

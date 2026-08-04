@@ -21,6 +21,11 @@ function text(value: FormDataEntryValue | null, label: string) {
   return result;
 }
 
+function optionalText(value: FormDataEntryValue | null) {
+  const result = typeof value === "string" ? value.trim() : "";
+  return result || undefined;
+}
+
 function positivePrice(value: FormDataEntryValue | null) {
   const price = Number(value);
   if (!Number.isFinite(price) || price < 0) throw new Error("El precio debe ser un número válido.");
@@ -64,6 +69,7 @@ export async function saveCatalogProduct(productId: string, formData: FormData, 
     const imageUrl = fileIsImage(image) ? await uploadImage(image) : undefined;
     const state = await updateCatalogState(expectedVersion, (current) => updateCatalogProduct(current, productId, {
       name: text(formData.get("name"), "El nombre"),
+      year: optionalText(formData.get("year")),
       price: positivePrice(formData.get("price")),
       teamId: text(formData.get("teamId"), "El equipo"),
       ...(imageUrl ? { image: imageUrl } : {}),
@@ -104,6 +110,7 @@ export async function createCatalogProduct(formData: FormData, expectedVersion: 
     const product = {
       id: text(formData.get("id"), "El ID"),
       name: text(formData.get("name"), "El nombre"),
+      year: optionalText(formData.get("year")),
       price: positivePrice(formData.get("price")),
       image: await uploadImage(image),
       sizes: sizes(formData.get("sizes")),

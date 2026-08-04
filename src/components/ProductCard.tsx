@@ -55,7 +55,8 @@ export default function ProductCard({ product, teamName }: { product: ProductWit
         <div className="flex justify-between items-start">
           <div className="flex-1 min-w-0 mr-2">
             <h3 className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest">{teamName ? `${teamName} · ` : ""}{product.category}</h3>
-            <h2 className="text-base font-bold truncate uppercase tracking-tighter">{product.name}</h2>
+            <h2 className="text-base font-bold break-words uppercase tracking-tighter">{product.name}</h2>
+            {product.year && <p className="text-xs text-zinc-400">Año: {product.year}</p>}
             <p className="text-xl font-black mt-1">${product.price.toLocaleString('es-AR')}</p>
           </div>
           <button 
