@@ -1,4 +1,4 @@
-import { list, put } from "@vercel/blob";
+import { BlobAccessError, get, put } from "@vercel/blob";
 import { emptyStockState, STOCK_STATE_VERSION, type StockState } from "@/lib/stock";
 
 export const STOCK_BLOB_PATH = "camisetas/stock/state-v1.json";
@@ -41,25 +41,40 @@ export async function readStockState(): Promise<StockState> {
 
 async function readStockDocument(): Promise<{ state: StockState; etag?: string }> {
   const token = getBlobToken();
-  const result = await list({ prefix: STOCK_BLOB_PATH, limit: 1, token });
-  const blob = result.blobs.find((item) => item.pathname === STOCK_BLOB_PATH);
+  let result;
 
-  if (!blob) {
-    return { state: emptyStockState() };
+  try {
+    result = await get(STOCK_BLOB_PATH, { access: "private", useCache: false, token });
+  } catch (error) {
+    if (!(error instanceof BlobAccessError)) {
+      throw new Error(
+        "Could not read the stock Blob. Verify that BLOB_READ_WRITE_TOKEN belongs to this project's Blob Store and has read permission.",
+        { cause: error },
+      );
+    }
+
+    try {
+      // Existing stock documents were public. Keep them readable while the next write migrates them.
+      result = await get(STOCK_BLOB_PATH, { access: "public", useCache: false, token });
+    } catch (fallbackError) {
+      throw new Error(
+        "Could not read the stock Blob because the token lacks permission. Verify that BLOB_READ_WRITE_TOKEN belongs to this project's Blob Store and has read permission.",
+        { cause: fallbackError },
+      );
+    }
   }
 
-  const response = await fetch(blob.url, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`Could not read the stock Blob (HTTP ${response.status}).`);
-  }
-
-  return { state: parseStockState(await response.json()), etag: blob.etag };
+  if (!result) return { state: emptyStockState() };
+  return {
+    state: parseStockState(await new Response(result.stream).json()),
+    etag: result.blob.etag,
+  };
 }
 
 async function writeStockState(state: StockState, etag?: string) {
   const token = getBlobToken();
   await put(STOCK_BLOB_PATH, JSON.stringify(state), {
-    access: "public",
+    access: "private",
     addRandomSuffix: false,
     allowOverwrite: Boolean(etag),
     contentType: "application/json",

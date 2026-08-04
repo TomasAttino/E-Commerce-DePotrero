@@ -22,7 +22,7 @@ Set `ADMIN_PASSWORD` in the server environment before using `/panel-privado-cami
 
 ## Persistent stock configuration
 
-Set `BLOB_READ_WRITE_TOKEN` in the server environment. Stock is stored separately from the catalog in the single public Blob document `camisetas/stock/state-v1.json`; the token is only used server-side. The document format is versioned:
+Set `BLOB_READ_WRITE_TOKEN` in the server environment. Stock is stored separately from the catalog in the single private Blob document `camisetas/stock/state-v1.json`; the token is only used server-side. Catalog state uses the same server-only/private access pattern at `camisetas/catalog/state-v1.json`. Existing public state documents remain readable and are migrated to private on their next successful write. If the token belongs to another Blob Store/project or lacks permission, the panel reports that configuration error instead of treating it as an absent document. The document format is versioned:
 
 ```json
 {

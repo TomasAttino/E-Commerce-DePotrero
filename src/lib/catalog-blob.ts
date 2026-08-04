@@ -1,4 +1,4 @@
-import { list, put } from "@vercel/blob";
+import { BlobAccessError, get, put } from "@vercel/blob";
 import { teamsMock } from "../../public/camisetas/mock";
 import { CATALOG_STATE_VERSION, createCatalogState, type CatalogState } from "@/lib/catalog";
 
@@ -24,12 +24,34 @@ function parseCatalogState(value: unknown): CatalogState {
 
 async function readCatalogDocument(): Promise<{ state: CatalogState; etag?: string }> {
   const token = getBlobToken();
-  const result = await list({ prefix: CATALOG_BLOB_PATH, limit: 1, token });
-  const blob = result.blobs.find((item) => item.pathname === CATALOG_BLOB_PATH);
-  if (!blob) return { state: createCatalogState(teamsMock) };
-  const response = await fetch(blob.url, { cache: "no-store" });
-  if (!response.ok) throw new Error(`No se pudo leer el Blob del catálogo (HTTP ${response.status}).`);
-  return { state: parseCatalogState(await response.json()), etag: blob.etag };
+  let result;
+
+  try {
+    result = await get(CATALOG_BLOB_PATH, { access: "private", useCache: false, token });
+  } catch (error) {
+    if (!(error instanceof BlobAccessError)) {
+      throw new Error(
+        "No se pudo leer el Blob del catálogo. Verificá que BLOB_READ_WRITE_TOKEN pertenezca al Blob Store de este proyecto y tenga permisos de lectura.",
+        { cause: error },
+      );
+    }
+
+    try {
+      // Existing catalog documents were public. Keep them readable while the next write migrates them.
+      result = await get(CATALOG_BLOB_PATH, { access: "public", useCache: false, token });
+    } catch (fallbackError) {
+      throw new Error(
+        "No se pudo leer el Blob del catálogo por falta de permisos. Verificá que BLOB_READ_WRITE_TOKEN pertenezca al Blob Store de este proyecto y tenga permisos de lectura.",
+        { cause: fallbackError },
+      );
+    }
+  }
+
+  if (!result) return { state: createCatalogState(teamsMock) };
+  return {
+    state: parseCatalogState(await new Response(result.stream).json()),
+    etag: result.blob.etag,
+  };
 }
 
 export async function readCatalogState() {
@@ -39,7 +61,7 @@ export async function readCatalogState() {
 async function writeCatalogState(state: CatalogState, etag?: string) {
   const token = getBlobToken();
   await put(CATALOG_BLOB_PATH, JSON.stringify(state), {
-    access: "public",
+    access: "private",
     addRandomSuffix: false,
     allowOverwrite: Boolean(etag),
     contentType: "application/json",
