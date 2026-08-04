@@ -1,22 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
 import Image from "next/image";
-
-type Product = {
-  id: string;
-  name: string;
-  price: number;
-  inStock: boolean;
-};
-
-type Team = {
-  id: string;
-  name: string;
-  banner: string;
-  products: Product[];
-};
+import { useState } from "react";
+import { exhaustStockProduct, toggleStockSize } from "@/app/actions/stock";
+import {
+  exhaustProduct,
+  filterStockTeams,
+  resolveProductStock,
+  toggleProductSize,
+  type StockState,
+  type TeamWithStock,
+} from "@/lib/stock";
 
 type Lead = {
   id: string;
@@ -26,114 +20,193 @@ type Lead = {
   createdAt: Date;
 };
 
-export default function DashboardContent({ initialTeams, leads }: { initialTeams: Team[]; leads: Lead[] }) {
-  const [searchTerm, setSearchTerm] = useState("");
+function stockPriority(product: TeamWithStock["products"][number]) {
+  if (!product.inStock) return 0;
+  if (product.availableSizes.length < product.sizes.length) return 1;
+  return 2;
+}
 
-  const filteredTeams = initialTeams.map(team => ({
+export default function DashboardContent({
+  initialTeams,
+  initialStock,
+  stockError,
+  leads,
+}: {
+  initialTeams: TeamWithStock[];
+  initialStock: StockState;
+  stockError?: string;
+  leads: Lead[];
+}) {
+  const [teams, setTeams] = useState(initialTeams);
+  const [stock, setStock] = useState(initialStock);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [feedback, setFeedback] = useState<Record<string, string>>({});
+
+  const filteredTeams = filterStockTeams(teams, searchTerm).map((team) => ({
     ...team,
-    products: team.products.filter(product => 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  })).filter(team => team.products.length > 0 || team.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    products: team.products.sort((a, b) => stockPriority(a) - stockPriority(b)),
+  }));
+
+  async function changeSize(productId: string, size: string) {
+    const previousStock = stock;
+    const product = teams.flatMap((team) => team.products).find((item) => item.id === productId);
+    if (!product) return;
+
+    const nextStock = toggleProductSize(stock, product, size);
+    setStock(nextStock);
+    setTeams((current) => current.map((team) => ({
+      ...team,
+      products: team.products.map((item) =>
+        item.id === productId ? resolveProductStock(item, nextStock) : item,
+      ),
+    })));
+    setFeedback((current) => ({ ...current, [productId]: "Guardando..." }));
+
+    const result = await toggleStockSize(productId, size, previousStock.version);
+    if (result.status === "success") {
+      setStock(result.state);
+      setFeedback((current) => ({ ...current, [productId]: result.message }));
+      return;
+    }
+
+    setStock(previousStock);
+    setTeams((current) => current.map((team) => ({
+      ...team,
+      products: team.products.map((item) =>
+        item.id === productId ? resolveProductStock(item, previousStock) : item,
+      ),
+    })));
+    setFeedback((current) => ({ ...current, [productId]: `Error: ${result.message}` }));
+  }
+
+  async function exhaustModel(productId: string) {
+    const previousStock = stock;
+    const product = teams.flatMap((team) => team.products).find((item) => item.id === productId);
+    if (!product) return;
+
+    const nextStock = exhaustProduct(stock, product);
+    setStock(nextStock);
+    setTeams((current) => current.map((team) => ({
+      ...team,
+      products: team.products.map((item) =>
+        item.id === productId ? resolveProductStock(item, nextStock) : item,
+      ),
+    })));
+    setFeedback((current) => ({ ...current, [productId]: "Guardando..." }));
+
+    const result = await exhaustStockProduct(productId, previousStock.version);
+    if (result.status === "success") {
+      setStock(result.state);
+      setFeedback((current) => ({ ...current, [productId]: result.message }));
+      return;
+    }
+
+    setStock(previousStock);
+    setTeams((current) => current.map((team) => ({
+      ...team,
+      products: team.products.map((item) =>
+        item.id === productId ? resolveProductStock(item, previousStock) : item,
+      ),
+    })));
+    setFeedback((current) => ({ ...current, [productId]: `Error: ${result.message}` }));
+  }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h1 className="text-3xl font-black">Dashboard</h1>
-        <div className="flex flex-wrap gap-4 w-full md:w-auto">
-          <input
-            type="text"
-            placeholder="Buscar camiseta o equipo..."
-            className="flex-1 md:w-64 bg-zinc-900 border border-white/10 px-4 py-2 text-sm focus:outline-none focus:border-white/30 transition-colors"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <Link 
-            href="/panel-privado-camisetas/teams/new" 
-            className="border border-white text-white px-4 py-2 font-bold hover:bg-white hover:text-black transition-colors text-sm"
-          >
-            Nuevo Equipo
-          </Link>
-          <Link 
-            href="/panel-privado-camisetas/products/new" 
-            className="bg-white text-black px-4 py-2 font-bold hover:bg-zinc-200 transition-colors text-sm"
-          >
-            Nuevo Producto
-          </Link>
+    <div className="space-y-10">
+      <header className="space-y-4">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-zinc-500">Catálogo público</p>
+          <h1 className="text-3xl font-black uppercase tracking-tight">Gestión manual de stock</h1>
         </div>
-      </div>
+        <input
+          type="search"
+          placeholder="Buscar por equipo, modelo o id..."
+          aria-label="Buscar por equipo, modelo o id"
+          className="w-full max-w-xl bg-zinc-900 border border-white/10 px-4 py-3 text-sm focus:outline-none focus:border-white/40"
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+        />
+      </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredTeams.map((team) => (
-          <div key={team.id} className="border border-white/10 bg-zinc-900 rounded-lg overflow-hidden flex flex-col">
-            <div className="relative h-32 w-full shrink-0">
-              {team.banner ? (
-                <Image 
-                  src={team.banner} 
-                  alt={team.name} 
-                  fill 
-                  className="object-cover opacity-50"
-                />
-              ) : (
-                <div className="w-full h-full bg-zinc-800" />
-              )}
-              <div className="absolute inset-0 flex items-center justify-center group/banner">
-                <h2 className="text-xl font-bold uppercase tracking-tighter">{team.name}</h2>
-                <Link 
-                  href={`/panel-privado-camisetas/teams/${team.id}`}
-                  className="absolute bottom-2 right-2 opacity-0 group-hover/banner:opacity-100 bg-white/10 hover:bg-white/20 text-[10px] px-2 py-1 rounded transition-all"
-                >
-                  Editar Equipo
-                </Link>
-              </div>
-            </div>
-            <div className="p-4 flex-1 flex flex-col min-h-0">
-              <h3 className="text-sm font-semibold text-zinc-400 mb-4">{team.products.length} Productos</h3>
-              <div className="space-y-2 overflow-y-auto max-h-64 pr-2 custom-scrollbar">
-                {team.products.map((product) => (
-                  <Link 
-                    key={product.id} 
-                    href={`/panel-privado-camisetas/products/${product.id}`}
-                    className="flex items-center justify-between group hover:bg-white/5 p-1 rounded transition-colors"
-                  >
-                    <span className="text-sm truncate mr-2">{product.name}</span>
-                    <div className="flex items-center space-x-2 shrink-0">
-                      {!product.inStock && (
-                        <span className="text-[10px] bg-red-500/20 text-red-500 px-1 font-bold uppercase">Sin Stock</span>
-                      )}
-                      <span className="text-xs text-zinc-500">${product.price.toLocaleString()}</span>
-                    </div>
-                  </Link>
-                ))}
-                {team.products.length === 0 && (
-                  <p className="text-xs text-zinc-600 italic">No se encontraron productos</p>
-                )}
-              </div>
-            </div>
+      {stockError && (
+        <div role="alert" className="border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
+          No se puede cargar el stock persistente: {stockError}
+        </div>
+      )}
+
+      {filteredTeams.map((team) => (
+        <section key={team.id} aria-labelledby={`team-${team.id}`} className="space-y-4">
+          <div className="flex items-end justify-between border-b border-white/10 pb-3">
+            <h2 id={`team-${team.id}`} className="text-2xl font-black uppercase tracking-tight">{team.name}</h2>
+            <span className="text-xs text-zinc-500">{team.products.length} modelos</span>
           </div>
-        ))}
-      </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {team.products.map((product) => (
+              <article key={product.id} className="flex gap-4 border border-white/10 bg-zinc-900 p-4">
+                <div className="relative h-28 w-24 shrink-0 overflow-hidden bg-black">
+                  <Image src={product.image} alt="" fill sizes="96px" className="object-cover" />
+                </div>
+                <div className="min-w-0 flex-1 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="truncate font-bold uppercase">{product.name}</h3>
+                      <p className="text-xs text-zinc-500">ID / modelo: {product.id}</p>
+                    </div>
+                    <span className={`shrink-0 text-[10px] font-black uppercase ${product.inStock ? "text-emerald-400" : "text-red-400"}`}>
+                      {product.inStock ? `${product.availableSizes.length}/${product.sizes.length} disponibles` : "Sin stock"}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {product.sizes.map((size) => {
+                      const available = product.availableSizes.includes(size);
+                      return (
+                        <button
+                          key={size}
+                          type="button"
+                          aria-pressed={available}
+                          aria-label={`${size}: ${available ? "Disponible" : "Agotado"}. Cambiar estado`}
+                          onClick={() => changeSize(product.id, size)}
+                          className={`min-w-12 border px-2 py-2 text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-white ${available ? "border-emerald-400/60 bg-emerald-400/10 text-emerald-300" : "border-red-400/50 bg-red-400/10 text-red-300"}`}
+                        >
+                          {size} · {available ? "Disponible" : "Agotado"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => exhaustModel(product.id)}
+                      className="border border-white/20 px-3 py-2 text-[10px] font-black uppercase tracking-wide hover:border-white/60"
+                    >
+                      Agotar modelo
+                    </button>
+                    <span aria-live="polite" className={`text-xs ${feedback[product.id]?.startsWith("Error") ? "text-red-400" : "text-zinc-400"}`}>
+                      {feedback[product.id]}
+                    </span>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ))}
+
+      {filteredTeams.length === 0 && <p className="text-sm text-zinc-500">No se encontraron productos.</p>}
 
       <section className="border border-white/10 bg-zinc-900 p-5">
         <h2 className="mb-5 text-xl font-black uppercase tracking-tight">Leads de primera compra</h2>
-        {leads.length === 0 ? (
-          <p className="text-sm text-zinc-500">Todavía no hay leads registrados.</p>
-        ) : (
+        {leads.length === 0 ? <p className="text-sm text-zinc-500">Todavía no hay leads registrados.</p> : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[620px] text-left text-sm">
               <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-zinc-500">
                 <tr><th className="pb-3 pr-4">Nombre</th><th className="pb-3 pr-4">Email</th><th className="pb-3 pr-4">Equipo</th><th className="pb-3">Fecha</th></tr>
               </thead>
-              <tbody>
-                {leads.map((lead) => (
-                  <tr key={lead.id} className="border-b border-white/5 last:border-0">
-                    <td className="py-3 pr-4">{lead.name}</td>
-                    <td className="py-3 pr-4 text-zinc-300">{lead.email}</td>
-                    <td className="py-3 pr-4">{lead.team}</td>
-                    <td className="py-3 text-zinc-400">{new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeStyle: "short" }).format(lead.createdAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
+              <tbody>{leads.map((lead) => (
+                <tr key={lead.id} className="border-b border-white/5 last:border-0">
+                  <td className="py-3 pr-4">{lead.name}</td><td className="py-3 pr-4 text-zinc-300">{lead.email}</td><td className="py-3 pr-4">{lead.team}</td><td className="py-3 text-zinc-400">{new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeStyle: "short" }).format(lead.createdAt)}</td>
+                </tr>
+              ))}</tbody>
             </table>
           </div>
         )}

@@ -1,12 +1,24 @@
-import { getTeams } from "../actions/products";
 import DashboardContent from "@/components/admin/DashboardContent";
 import { getLeads } from "../actions/leads";
+import { getPanelStockState } from "../actions/stock";
+import { resolveTeamsStock, resolveUnavailableTeamsStock, emptyStockState } from "@/lib/stock";
+import { teamsMock } from "../../../public/camisetas/mock";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  const teams = await getTeams();
+  let stock = undefined;
+  let stockError: string | undefined;
+  try {
+    stock = await getPanelStockState();
+  } catch (error) {
+    stockError = error instanceof Error ? error.message : "No se pudo leer el stock persistente.";
+  }
   const leads = await getLeads();
 
-  return <DashboardContent initialTeams={teams} leads={leads} />;
+  const initialStock = stock ?? emptyStockState();
+  const initialTeams = stock
+    ? resolveTeamsStock(teamsMock, stock)
+    : resolveUnavailableTeamsStock(teamsMock);
+  return <DashboardContent initialTeams={initialTeams} initialStock={initialStock} stockError={stockError} leads={leads} />;
 }

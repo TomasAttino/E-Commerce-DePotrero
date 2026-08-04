@@ -1,12 +1,12 @@
 "use client";
 
-import { Team } from "../../public/camisetas/mock";
+import type { TeamWithStock } from "@/lib/stock";
 import Image from "next/image";
 import ProductCard from "./ProductCard";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRef } from "react";
 
-export default function TeamSection({ team }: { team: Team }) {
+export default function TeamSection({ team }: { team: TeamWithStock }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scroll = (direction: 'left' | 'right') => {

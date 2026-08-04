@@ -7,7 +7,7 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean, onClo
   const { cart, removeFromCart, totalPrice, totalItems } = useCart();
 
   const handleWhatsAppOrder = () => {
-    const phoneNumber = "5491123456789"; // Reemplazar con número real
+    const phoneNumber = "5491137684212";
     const message = cart.map(item => 
       `- ${item.name} (${item.quantity}x) | Talle: ${item.selectedSize} }`
     ).join('\n');

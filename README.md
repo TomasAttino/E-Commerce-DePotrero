@@ -20,6 +20,26 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 Set `ADMIN_PASSWORD` in the server environment before using `/panel-privado-camisetas/login`. The value is read only on the server; the panel remains inaccessible when it is not configured. Do not commit real credentials.
 
+## Persistent stock configuration
+
+Set `BLOB_READ_WRITE_TOKEN` in the server environment. Stock is stored separately from the catalog in the single public Blob document `camisetas/stock/state-v1.json`; the token is only used server-side. The document format is versioned:
+
+```json
+{
+  "schemaVersion": 1,
+  "version": 3,
+  "updatedAt": "2026-07-31T00:00:00.000Z",
+  "products": {
+    "boca-2": {
+      "exhausted": false,
+      "unavailableSizes": ["XL"]
+    }
+  }
+}
+```
+
+The mock catalog remains the only product universe. Products without an override use their declared sizes; a mock product with `inStock: false` starts fully exhausted. `Agotar modelo` sets the global flag, and reactivating one size clears that flag while leaving every other size exhausted.
+
 ## Deployment and migrations
 
 Production deployments must provide `DATABASE_URL` and use the `vercel-build` script (Vercel detects this script automatically) or configure the platform build command as `npm run vercel-build`. It runs `prisma migrate deploy` before the regular build, applying only pending migrations without resetting or deleting existing data. Keep `npm run build` for local/CI builds that do not have a database connection.

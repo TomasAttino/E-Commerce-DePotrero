@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
     qualities: [75, 85],
     localPatterns: [
       { pathname: '/camisetas/**' },
+      { pathname: '/isologo.png' },
     ],
     remotePatterns: [
       { protocol: 'https', hostname: 'i.pinimg.com' },
