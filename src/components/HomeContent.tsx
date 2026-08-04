@@ -9,7 +9,7 @@ import WhatsAppButton from "@/components/WhatsAppButton";
 import LeadCaptureModal from "@/components/LeadCaptureModal";
 import type { TeamWithStock } from "@/lib/stock";
 
-export default function HomeContent({ teams, stockError }: { teams: TeamWithStock[]; stockError?: string }) {
+export default function HomeContent({ teams, stockError, catalogError }: { teams: TeamWithStock[]; stockError?: string; catalogError?: string }) {
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   return (
@@ -21,6 +21,7 @@ export default function HomeContent({ teams, stockError }: { teams: TeamWithStoc
           No se puede verificar el stock persistente. Las compras están temporalmente deshabilitadas. {stockError}
         </div>
       )}
+      {catalogError && <div role="status" className="border-b border-amber-400/30 bg-amber-400/10 px-4 py-3 text-center text-xs text-amber-200">Se está mostrando el catálogo inicial mientras se recupera el catálogo editable.</div>}
       
       <Hero />
       

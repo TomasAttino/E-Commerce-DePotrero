@@ -15,9 +15,11 @@ const PRODUCTS_PER_PAGE = 24;
 export default function CatalogContent({
   teams,
   stockError,
+  catalogError,
 }: {
   teams: TeamWithStock[];
   stockError?: string;
+  catalogError?: string;
 }) {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -80,6 +82,7 @@ export default function CatalogContent({
             No se puede verificar el stock persistente. Las compras están temporalmente deshabilitadas.
           </div>
         )}
+        {catalogError && <div role="status" className="mb-8 border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-center text-xs text-amber-200">Se está mostrando el catálogo inicial mientras se recupera el catálogo editable.</div>}
         <div className="mb-10 max-w-3xl">
           <p className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-zinc-500">Colección completa</p>
           <h1 id="catalog-title" className="text-4xl font-black uppercase italic tracking-tighter sm:text-6xl">Catálogo</h1>

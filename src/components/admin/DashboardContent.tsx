@@ -1,216 +1,133 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { createCatalogProduct, createCatalogTeam, saveCatalogProduct } from "@/app/actions/catalog";
 import { exhaustStockProduct, toggleStockSize } from "@/app/actions/stock";
-import {
-  exhaustProduct,
-  filterStockTeams,
-  resolveProductStock,
-  toggleProductSize,
-  type StockState,
-  type TeamWithStock,
-} from "@/lib/stock";
+import { paginate, filterCatalogProducts, type CatalogState } from "@/lib/catalog";
+import { resolveProductStock, type StockState, type TeamWithStock } from "@/lib/stock";
 
-type Lead = {
-  id: string;
-  name: string;
-  email: string;
-  team: string;
-  createdAt: Date;
-};
-
-function stockPriority(product: TeamWithStock["products"][number]) {
-  if (!product.inStock) return 0;
-  if (product.availableSizes.length < product.sizes.length) return 1;
-  return 2;
-}
+type Lead = { id: string; name: string; email: string; team: string; createdAt: Date };
+type Feedback = { status: "success" | "error" | "pending"; message: string };
 
 export default function DashboardContent({
+  initialCatalog,
   initialTeams,
   initialStock,
   stockError,
+  catalogError,
   leads,
 }: {
+  initialCatalog: CatalogState;
   initialTeams: TeamWithStock[];
   initialStock: StockState;
   stockError?: string;
+  catalogError?: string;
   leads: Lead[];
 }) {
+  const [catalog, setCatalog] = useState(initialCatalog);
   const [teams, setTeams] = useState(initialTeams);
   const [stock, setStock] = useState(initialStock);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [feedback, setFeedback] = useState<Record<string, string>>({});
+  const [query, setQuery] = useState("");
+  const [teamFilter, setTeamFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [feedback, setFeedback] = useState<Feedback>({ status: "success", message: "" });
+  const [newTeamOpen, setNewTeamOpen] = useState(false);
+  const [newProductOpen, setNewProductOpen] = useState(false);
 
-  const filteredTeams = filterStockTeams(teams, searchTerm).map((team) => ({
-    ...team,
-    products: team.products.sort((a, b) => stockPriority(a) - stockPriority(b)),
-  }));
+  const filtered = useMemo(() => paginate(filterCatalogProducts(catalog, query, teamFilter), page), [catalog, page, query, teamFilter]);
+  const stockById = useMemo(() => new Map(teams.flatMap((team) => team.products.map((product) => [product.id, product]))), [teams]);
+
+  function show(result: Feedback) {
+    setFeedback(result);
+  }
+
+  async function saveProduct(productId: string, form: HTMLFormElement) {
+    show({ status: "pending", message: "Guardando producto..." });
+    const result = await saveCatalogProduct(productId, new FormData(form), catalog.version);
+    if (result.status === "success") {
+      setCatalog(result.state);
+      setTeams(result.state.teams.map((team) => ({ ...team, products: team.products.map((product) => resolveProductStock(product, stock)) })));
+    }
+    show({ status: result.status, message: result.message });
+  }
+
+  async function submitNewTeam(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    show({ status: "pending", message: "Guardando equipo..." });
+    const result = await createCatalogTeam(new FormData(event.currentTarget), catalog.version);
+    if (result.status === "success") {
+      setCatalog(result.state);
+      setTeams(result.state.teams.map((team) => ({ ...team, products: team.products.map((product) => resolveProductStock(product, stock)) })));
+      event.currentTarget.reset();
+      setNewTeamOpen(false);
+    }
+    show({ status: result.status, message: result.message });
+  }
+
+  async function submitNewProduct(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    show({ status: "pending", message: "Subiendo imagen y guardando producto..." });
+    const result = await createCatalogProduct(new FormData(event.currentTarget), catalog.version);
+    if (result.status === "success") {
+      setCatalog(result.state);
+      setTeams(result.state.teams.map((team) => ({ ...team, products: team.products.map((product) => resolveProductStock(product, stock)) })));
+      event.currentTarget.reset();
+      setNewProductOpen(false);
+      setPage(1);
+    }
+    show({ status: result.status, message: result.message });
+  }
 
   async function changeSize(productId: string, size: string) {
-    const previousStock = stock;
-    const product = teams.flatMap((team) => team.products).find((item) => item.id === productId);
+    const product = stockById.get(productId);
     if (!product) return;
-
-    const nextStock = toggleProductSize(stock, product, size);
-    setStock(nextStock);
-    setTeams((current) => current.map((team) => ({
-      ...team,
-      products: team.products.map((item) =>
-        item.id === productId ? resolveProductStock(item, nextStock) : item,
-      ),
-    })));
-    setFeedback((current) => ({ ...current, [productId]: "Guardando..." }));
-
-    const result = await toggleStockSize(productId, size, previousStock.version);
-    if (result.status === "success") {
-      setStock(result.state);
-      setFeedback((current) => ({ ...current, [productId]: result.message }));
-      return;
+    const previous = stock;
+    const next = { ...stock, products: { ...stock.products, [productId]: { exhausted: false, unavailableSizes: resolveProductStock(product, stock).availableSizes.includes(size) ? [...resolveProductStock(product, stock).unavailableSizes, size] : resolveProductStock(product, stock).unavailableSizes.filter((item) => item !== size) } } };
+    setStock(next);
+    setTeams((current) => current.map((team) => ({ ...team, products: team.products.map((item) => item.id === productId ? resolveProductStock(item, next) : item) })));
+    show({ status: "pending", message: "Guardando stock..." });
+    const result = await toggleStockSize(productId, size, previous.version);
+    if (result.status === "success") setStock(result.state);
+    else {
+      setStock(previous);
+      setTeams((current) => current.map((team) => ({ ...team, products: team.products.map((item) => item.id === productId ? resolveProductStock(item, previous) : item) })));
     }
-
-    setStock(previousStock);
-    setTeams((current) => current.map((team) => ({
-      ...team,
-      products: team.products.map((item) =>
-        item.id === productId ? resolveProductStock(item, previousStock) : item,
-      ),
-    })));
-    setFeedback((current) => ({ ...current, [productId]: `Error: ${result.message}` }));
+    show({ status: result.status, message: result.message });
   }
 
   async function exhaustModel(productId: string) {
-    const previousStock = stock;
-    const product = teams.flatMap((team) => team.products).find((item) => item.id === productId);
+    const product = stockById.get(productId);
     if (!product) return;
-
-    const nextStock = exhaustProduct(stock, product);
-    setStock(nextStock);
-    setTeams((current) => current.map((team) => ({
-      ...team,
-      products: team.products.map((item) =>
-        item.id === productId ? resolveProductStock(item, nextStock) : item,
-      ),
-    })));
-    setFeedback((current) => ({ ...current, [productId]: "Guardando..." }));
-
-    const result = await exhaustStockProduct(productId, previousStock.version);
-    if (result.status === "success") {
-      setStock(result.state);
-      setFeedback((current) => ({ ...current, [productId]: result.message }));
-      return;
-    }
-
-    setStock(previousStock);
-    setTeams((current) => current.map((team) => ({
-      ...team,
-      products: team.products.map((item) =>
-        item.id === productId ? resolveProductStock(item, previousStock) : item,
-      ),
-    })));
-    setFeedback((current) => ({ ...current, [productId]: `Error: ${result.message}` }));
+    const previous = stock;
+    const next = { ...stock, products: { ...stock.products, [productId]: { exhausted: true, unavailableSizes: [] } } };
+    setStock(next);
+    setTeams((current) => current.map((team) => ({ ...team, products: team.products.map((item) => item.id === productId ? resolveProductStock(item, next) : item) })));
+    show({ status: "pending", message: "Guardando stock..." });
+    const result = await exhaustStockProduct(productId, previous.version);
+    if (result.status === "success") setStock(result.state);
+    else { setStock(previous); setTeams((current) => current.map((team) => ({ ...team, products: team.products.map((item) => item.id === productId ? resolveProductStock(item, previous) : item) }))); }
+    show({ status: result.status, message: result.message });
   }
 
-  return (
-    <div className="space-y-10">
-      <header className="space-y-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.25em] text-zinc-500">Catálogo público</p>
-          <h1 className="text-3xl font-black uppercase tracking-tight">Gestión manual de stock</h1>
-        </div>
-        <input
-          type="search"
-          placeholder="Buscar por equipo, modelo o id..."
-          aria-label="Buscar por equipo, modelo o id"
-          className="w-full max-w-xl bg-zinc-900 border border-white/10 px-4 py-3 text-sm focus:outline-none focus:border-white/40"
-          value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
-        />
-      </header>
+  return <div className="space-y-10">
+    <header className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div><p className="text-xs font-bold uppercase tracking-[0.25em] text-lime-400">Catálogo público · Blob</p><h1 className="text-3xl font-black uppercase tracking-tight">Panel de producción</h1><p className="mt-2 text-sm text-zinc-400">Los cambios de esta pantalla se publican en la web.</p></div>
+        <div className="flex gap-2"><button type="button" onClick={() => setNewTeamOpen((value) => !value)} className="border border-white/20 px-4 py-3 text-xs font-bold uppercase hover:border-white">Nuevo equipo</button><button type="button" onClick={() => setNewProductOpen((value) => !value)} className="bg-white px-4 py-3 text-xs font-bold uppercase text-black hover:bg-zinc-200">Nuevo producto</button></div>
+      </div>
+      <div className="grid gap-3 md:grid-cols-[minmax(0,2fr)_1fr]"><input type="search" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Buscar por equipo, nombre o ID..." aria-label="Buscar catálogo" className="border border-white/10 bg-zinc-900 px-4 py-3 text-sm outline-none focus:border-white/50" /><select value={teamFilter} onChange={(event) => { setTeamFilter(event.target.value); setPage(1); }} aria-label="Filtrar por equipo" className="border border-white/10 bg-zinc-900 px-4 py-3 text-sm outline-none focus:border-white/50"><option value="all">Todos los equipos</option>{catalog.teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></div>
+    </header>
+    {(stockError || catalogError) && <div role="alert" className="border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">{catalogError ? `Catálogo en modo fallback: ${catalogError}` : `Stock no verificable: ${stockError}`}</div>}
+    {feedback.message && <div role={feedback.status === "error" ? "alert" : "status"} className={`border p-3 text-sm ${feedback.status === "error" ? "border-red-500/40 text-red-300" : feedback.status === "success" ? "border-emerald-500/40 text-emerald-300" : "border-white/10 text-zinc-300"}`}>{feedback.message}</div>}
 
-      {stockError && (
-        <div role="alert" className="border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
-          No se puede cargar el stock persistente: {stockError}
-        </div>
-      )}
+    {newTeamOpen && <form onSubmit={submitNewTeam} className="grid gap-3 border border-white/10 bg-zinc-900 p-5 md:grid-cols-[1fr_1fr_auto]"><input name="name" required placeholder="Nombre del equipo" className="border border-white/10 bg-black px-3 py-3 text-sm" /><input name="slug" required pattern="[a-z0-9-]+" placeholder="slug-seguro" className="border border-white/10 bg-black px-3 py-3 text-sm" /><button className="bg-white px-4 py-3 text-xs font-bold uppercase text-black">Guardar equipo</button></form>}
+    {newProductOpen && <form onSubmit={submitNewProduct} className="grid gap-4 border border-white/10 bg-zinc-900 p-5 md:grid-cols-2"><input name="id" required placeholder="ID único (ej. boca-buzo-1)" className="border border-white/10 bg-black px-3 py-3 text-sm" /><input name="name" required placeholder="Nombre visible" className="border border-white/10 bg-black px-3 py-3 text-sm" /><input name="price" required type="number" min="0" step="1" placeholder="Precio" className="border border-white/10 bg-black px-3 py-3 text-sm" /><select name="teamId" required className="border border-white/10 bg-black px-3 py-3 text-sm">{catalog.teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select><input name="category" required defaultValue="Camisetas" placeholder="Categoría / tipo" className="border border-white/10 bg-black px-3 py-3 text-sm" /><input name="sizes" required defaultValue="S, M, L, XL" placeholder="Talles separados por coma" className="border border-white/10 bg-black px-3 py-3 text-sm" /><label className="border border-white/10 bg-black px-3 py-3 text-sm text-zinc-400 md:col-span-2">Imagen principal<input name="image" required type="file" accept="image/*" className="mt-2 block w-full text-xs" /></label><button className="bg-white px-4 py-3 text-xs font-bold uppercase text-black md:col-span-2">Subir y guardar producto</button></form>}
 
-      {filteredTeams.map((team) => (
-        <section key={team.id} aria-labelledby={`team-${team.id}`} className="space-y-4">
-          <div className="flex items-end justify-between border-b border-white/10 pb-3">
-            <h2 id={`team-${team.id}`} className="text-2xl font-black uppercase tracking-tight">{team.name}</h2>
-            <span className="text-xs text-zinc-500">{team.products.length} modelos</span>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            {team.products.map((product) => (
-              <article key={product.id} className="flex gap-4 border border-white/10 bg-zinc-900 p-4">
-                <div className="relative h-28 w-24 shrink-0 overflow-hidden bg-black">
-                  <Image src={product.image} alt="" fill sizes="96px" className="object-cover" />
-                </div>
-                <div className="min-w-0 flex-1 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="truncate font-bold uppercase">{product.name}</h3>
-                      <p className="text-xs text-zinc-500">ID / modelo: {product.id}</p>
-                    </div>
-                    <span className={`shrink-0 text-[10px] font-black uppercase ${product.inStock ? "text-emerald-400" : "text-red-400"}`}>
-                      {product.inStock ? `${product.availableSizes.length}/${product.sizes.length} disponibles` : "Sin stock"}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {product.sizes.map((size) => {
-                      const available = product.availableSizes.includes(size);
-                      return (
-                        <button
-                          key={size}
-                          type="button"
-                          aria-pressed={available}
-                          aria-label={`${size}: ${available ? "Disponible" : "Agotado"}. Cambiar estado`}
-                          onClick={() => changeSize(product.id, size)}
-                          className={`min-w-12 border px-2 py-2 text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-white ${available ? "border-emerald-400/60 bg-emerald-400/10 text-emerald-300" : "border-red-400/50 bg-red-400/10 text-red-300"}`}
-                        >
-                          {size} · {available ? "Disponible" : "Agotado"}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() => exhaustModel(product.id)}
-                      className="border border-white/20 px-3 py-2 text-[10px] font-black uppercase tracking-wide hover:border-white/60"
-                    >
-                      Agotar modelo
-                    </button>
-                    <span aria-live="polite" className={`text-xs ${feedback[product.id]?.startsWith("Error") ? "text-red-400" : "text-zinc-400"}`}>
-                      {feedback[product.id]}
-                    </span>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      ))}
+    <div className="flex items-center justify-between text-xs text-zinc-500"><span>{filtered.items.length} de {filterCatalogProducts(catalog, query, teamFilter).length} productos</span><span>Página {filtered.currentPage} de {filtered.totalPages}</span></div>
+    <div className="space-y-4">{filtered.items.map(({ product, team }) => { const withStock = stockById.get(product.id); return <article key={product.id} className="border border-white/10 bg-zinc-900 p-4"><div className="flex flex-col gap-4 xl:flex-row"><div className="relative h-36 w-28 shrink-0 overflow-hidden bg-black"><Image src={product.image} alt="" fill sizes="112px" className="object-cover" /></div><form onSubmit={(event) => { event.preventDefault(); void saveProduct(product.id, event.currentTarget); }} className="grid min-w-0 flex-1 gap-3 md:grid-cols-4"><div className="md:col-span-2"><label className="text-[10px] uppercase text-zinc-500">Nombre · {product.id}</label><input name="name" required defaultValue={product.name} className="mt-1 w-full border border-white/10 bg-black px-3 py-2 text-sm" /></div><div><label className="text-[10px] uppercase text-zinc-500">Precio</label><input name="price" required type="number" min="0" defaultValue={product.price} className="mt-1 w-full border border-white/10 bg-black px-3 py-2 text-sm" /></div><div><label className="text-[10px] uppercase text-zinc-500">Equipo</label><select name="teamId" defaultValue={team.id} className="mt-1 w-full border border-white/10 bg-black px-3 py-2 text-sm">{catalog.teams.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}</select></div><label className="text-xs text-zinc-500 md:col-span-3">Reemplazar imagen (opcional)<input name="image" type="file" accept="image/*" className="mt-1 block w-full text-xs" /></label><button className="self-end bg-white px-3 py-2 text-xs font-bold uppercase text-black">Guardar cambios</button></form></div><div className="mt-4 border-t border-white/10 pt-4"><div className="mb-2 flex items-center justify-between"><span className="text-xs font-bold uppercase text-zinc-400">Talles y stock manual</span><button type="button" onClick={() => void exhaustModel(product.id)} className="text-[10px] font-bold uppercase text-red-300 hover:text-red-200">Agotar modelo</button></div><div className="flex flex-wrap gap-2">{product.sizes.map((size) => { const available = withStock?.availableSizes.includes(size) ?? false; return <button key={size} type="button" aria-pressed={available} onClick={() => void changeSize(product.id, size)} className={`border px-3 py-2 text-xs font-bold ${available ? "border-emerald-400/50 text-emerald-300" : "border-red-400/50 text-red-300"}`}>{size} · {available ? "Disponible" : "Agotado"}</button>; })}</div></div></article>; })}</div>
+    <nav className="flex justify-center gap-2" aria-label="Paginación del panel"><button type="button" disabled={filtered.currentPage === 1} onClick={() => setPage(filtered.currentPage - 1)} className="border border-white/15 px-4 py-2 text-xs uppercase disabled:opacity-30">Anterior</button><button type="button" disabled={filtered.currentPage === filtered.totalPages} onClick={() => setPage(filtered.currentPage + 1)} className="border border-white/15 px-4 py-2 text-xs uppercase disabled:opacity-30">Siguiente</button></nav>
 
-      {filteredTeams.length === 0 && <p className="text-sm text-zinc-500">No se encontraron productos.</p>}
-
-      <section className="border border-white/10 bg-zinc-900 p-5">
-        <h2 className="mb-5 text-xl font-black uppercase tracking-tight">Leads de primera compra</h2>
-        {leads.length === 0 ? <p className="text-sm text-zinc-500">Todavía no hay leads registrados.</p> : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[620px] text-left text-sm">
-              <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-zinc-500">
-                <tr><th className="pb-3 pr-4">Nombre</th><th className="pb-3 pr-4">Email</th><th className="pb-3 pr-4">Equipo</th><th className="pb-3">Fecha</th></tr>
-              </thead>
-              <tbody>{leads.map((lead) => (
-                <tr key={lead.id} className="border-b border-white/5 last:border-0">
-                  <td className="py-3 pr-4">{lead.name}</td><td className="py-3 pr-4 text-zinc-300">{lead.email}</td><td className="py-3 pr-4">{lead.team}</td><td className="py-3 text-zinc-400">{new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeStyle: "short" }).format(lead.createdAt)}</td>
-                </tr>
-              ))}</tbody>
-            </table>
-          </div>
-        )}
-      </section>
-    </div>
-  );
+    <section className="border border-white/10 bg-zinc-900 p-5"><h2 className="mb-5 text-xl font-black uppercase tracking-tight">Leads de primera compra</h2>{leads.length === 0 ? <p className="text-sm text-zinc-500">Todavía no hay leads registrados.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="border-b border-white/10 text-xs uppercase tracking-wider text-zinc-500"><tr><th className="pb-3 pr-4">Nombre</th><th className="pb-3 pr-4">Email</th><th className="pb-3 pr-4">Equipo</th><th className="pb-3">Fecha</th></tr></thead><tbody>{leads.map((lead) => <tr key={lead.id} className="border-b border-white/5 last:border-0"><td className="py-3 pr-4">{lead.name}</td><td className="py-3 pr-4 text-zinc-300">{lead.email}</td><td className="py-3 pr-4">{lead.team}</td><td className="py-3 text-zinc-400">{new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeStyle: "short" }).format(lead.createdAt)}</td></tr>)}</tbody></table></div>}</section>
+  </div>;
 }

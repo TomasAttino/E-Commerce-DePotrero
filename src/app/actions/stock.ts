@@ -1,32 +1,29 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { teamsMock } from "../../../public/camisetas/mock";
 import { requireAdmin } from "@/lib/admin-auth";
 import { exhaustProduct, toggleProductSize, type StockState } from "@/lib/stock";
 import { readStockState, updateStockState } from "@/lib/stock-blob";
+import { readCatalogState } from "@/lib/catalog-blob";
 
 export type StockActionResult =
   | { status: "success"; message: string; state: StockState }
   | { status: "error"; message: string };
 
-function findProduct(productId: string) {
-  for (const team of teamsMock) {
-    const product = team.products.find((item) => item.id === productId);
-    if (product) return product;
-  }
-  throw new Error("El producto no existe en el catálogo público.");
-}
-
 async function persist(
   expectedVersion: number,
-  update: (state: StockState) => StockState,
+  productId: string,
+  update: (state: StockState, product: Awaited<ReturnType<typeof readCatalogState>>["teams"][number]["products"][number]) => StockState,
 ): Promise<StockActionResult> {
   await requireAdmin();
 
   try {
-    const state = await updateStockState(expectedVersion, update);
+    const catalog = await readCatalogState();
+    const product = catalog.teams.flatMap((team) => team.products).find((item) => item.id === productId);
+    if (!product) throw new Error("El producto no existe en el catálogo público.");
+    const state = await updateStockState(expectedVersion, (stock) => update(stock, product));
     revalidatePath("/");
+    revalidatePath("/catalogo");
     revalidatePath("/panel-privado-camisetas");
     return { status: "success", message: "Guardado", state };
   } catch (error) {
@@ -42,16 +39,14 @@ export async function toggleStockSize(
   size: string,
   expectedVersion: number,
 ): Promise<StockActionResult> {
-  const product = findProduct(productId);
-  return persist(expectedVersion, (state) => toggleProductSize(state, product, size));
+  return persist(expectedVersion, productId, (state, product) => toggleProductSize(state, product, size));
 }
 
 export async function exhaustStockProduct(
   productId: string,
   expectedVersion: number,
 ): Promise<StockActionResult> {
-  const product = findProduct(productId);
-  return persist(expectedVersion, (state) => exhaustProduct(state, product));
+  return persist(expectedVersion, productId, (state, product) => exhaustProduct(state, product));
 }
 
 export async function getPanelStockState() {

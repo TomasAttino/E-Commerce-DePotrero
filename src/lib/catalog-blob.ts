@@ -1,0 +1,67 @@
+import { list, put } from "@vercel/blob";
+import { teamsMock } from "../../public/camisetas/mock";
+import { CATALOG_STATE_VERSION, createCatalogState, type CatalogState } from "@/lib/catalog";
+
+export const CATALOG_BLOB_PATH = "camisetas/catalog/state-v1.json";
+
+let writeQueue = Promise.resolve();
+
+function getBlobToken() {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) throw new Error("BLOB_READ_WRITE_TOKEN is not configured. Set it before editing the catalog.");
+  return token;
+}
+
+function parseCatalogState(value: unknown): CatalogState {
+  if (!value || typeof value !== "object") throw new Error("El Blob del catálogo no contiene un JSON válido.");
+  const candidate = value as Partial<CatalogState>;
+  if (candidate.schemaVersion !== CATALOG_STATE_VERSION || typeof candidate.version !== "number" ||
+      typeof candidate.updatedAt !== "string" || !Array.isArray(candidate.teams)) {
+    throw new Error("El Blob del catálogo tiene un formato inválido o incompatible.");
+  }
+  return candidate as CatalogState;
+}
+
+async function readCatalogDocument(): Promise<{ state: CatalogState; etag?: string }> {
+  const token = getBlobToken();
+  const result = await list({ prefix: CATALOG_BLOB_PATH, limit: 1, token });
+  const blob = result.blobs.find((item) => item.pathname === CATALOG_BLOB_PATH);
+  if (!blob) return { state: createCatalogState(teamsMock) };
+  const response = await fetch(blob.url, { cache: "no-store" });
+  if (!response.ok) throw new Error(`No se pudo leer el Blob del catálogo (HTTP ${response.status}).`);
+  return { state: parseCatalogState(await response.json()), etag: blob.etag };
+}
+
+export async function readCatalogState() {
+  return (await readCatalogDocument()).state;
+}
+
+async function writeCatalogState(state: CatalogState, etag?: string) {
+  const token = getBlobToken();
+  await put(CATALOG_BLOB_PATH, JSON.stringify(state), {
+    access: "public",
+    addRandomSuffix: false,
+    allowOverwrite: Boolean(etag),
+    contentType: "application/json",
+    ...(etag ? { ifMatch: etag } : {}),
+    token,
+  });
+}
+
+export async function updateCatalogState(expectedVersion: number, update: (state: CatalogState) => CatalogState) {
+  const operation = writeQueue.then(async () => {
+    const { state: current, etag } = await readCatalogDocument();
+    if (current.version !== expectedVersion) throw new Error("El catálogo cambió en otra sesión. Recargá el panel e intentá nuevamente.");
+    const next = update(current);
+    const state: CatalogState = {
+      ...next,
+      schemaVersion: CATALOG_STATE_VERSION,
+      version: current.version + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    await writeCatalogState(state, etag);
+    return state;
+  });
+  writeQueue = operation.then(() => undefined, () => undefined);
+  return operation;
+}
