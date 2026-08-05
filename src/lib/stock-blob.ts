@@ -1,4 +1,15 @@
-import { BlobError, BlobPreconditionFailedError, get, head, put } from "@vercel/blob";
+import {
+  BlobAccessError,
+  BlobClientTokenExpiredError,
+  BlobError,
+  BlobNotFoundError,
+  BlobPreconditionFailedError,
+  BlobStoreNotFoundError,
+  BlobStoreSuspendedError,
+  get,
+  head,
+  put,
+} from "@vercel/blob";
 import { emptyStockState, STOCK_STATE_VERSION, type StockState } from "@/lib/stock";
 
 export const STOCK_BLOB_PATH = "camisetas/stock/state-v1.json";
@@ -41,44 +52,52 @@ export async function readStockState(): Promise<StockState> {
 
 async function readStockDocument(): Promise<{ state: StockState; etag?: string }> {
   const token = getBlobToken();
-  let result;
-  let access: "private" | "public" = "private";
 
   try {
-    result = await get(STOCK_BLOB_PATH, { access: "private", useCache: false, token });
+    const result = await get(STOCK_BLOB_PATH, { access: "private", useCache: false, token });
+    if (!result) return { state: emptyStockState() };
+    const metadata = await head(STOCK_BLOB_PATH, { token });
+    return { state: parseStockState(await new Response(result.stream).json()), etag: metadata.etag };
   } catch (error) {
+    if (error instanceof BlobNotFoundError) return { state: emptyStockState() };
     if (!(error instanceof BlobError)) {
-      throw new Error(
-        "Could not read the stock Blob. Verify that BLOB_READ_WRITE_TOKEN belongs to this project's Blob Store and has read permission.",
-        { cause: error },
-      );
+      throw new Error("Could not read the stock Blob because of a temporary network problem. Try again.", {
+        cause: error,
+      });
     }
-
-    try {
-      // Existing stock documents were public. Keep them readable while the next write migrates them.
-      access = "public";
-      result = await get(STOCK_BLOB_PATH, { access: "public", useCache: false, token });
-    } catch (fallbackError) {
-      throw new Error(
-        "Could not read the stock Blob because the token lacks permission. Verify that BLOB_READ_WRITE_TOKEN belongs to this project's Blob Store and has read permission.",
-        { cause: fallbackError },
-      );
+    if (
+      error instanceof BlobAccessError ||
+      error instanceof BlobClientTokenExpiredError ||
+      error instanceof BlobStoreNotFoundError ||
+      error instanceof BlobStoreSuspendedError
+    ) {
+      throw new Error("Could not read the stock Blob because of a permission or Blob Store configuration problem.", {
+        cause: error,
+      });
     }
   }
 
-  if (!result) return { state: emptyStockState() };
-
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const before = await head(STOCK_BLOB_PATH, { token });
-    const current = await get(STOCK_BLOB_PATH, { access, useCache: false, token });
-    const after = await head(STOCK_BLOB_PATH, { token });
-    if (before.etag === after.etag) {
-      if (!current) continue;
-      return { state: parseStockState(await new Response(current.stream).json()), etag: after.etag };
+  try {
+    const metadata = await head(STOCK_BLOB_PATH, { token });
+    const response = await fetch(metadata.url, { cache: "no-store" });
+    if (response.status === 404) return { state: emptyStockState() };
+    if (response.status === 401 || response.status === 403) {
+      throw new Error("Could not read the stock Blob because of a permission or Blob Store configuration problem.");
     }
+    if (!response.ok) throw new Error("public-read-failed");
+    return { state: parseStockState(await response.json()), etag: metadata.etag };
+  } catch (error) {
+    if (error instanceof BlobNotFoundError) return { state: emptyStockState() };
+    if (
+      error instanceof Error &&
+      error.message === "Could not read the stock Blob because of a permission or Blob Store configuration problem."
+    ) {
+      throw error;
+    }
+    throw new Error("Could not read the stock Blob because of a temporary network problem. Try again.", {
+      cause: error,
+    });
   }
-
-  throw new Error("Could not obtain a stable read of the stock Blob. Reload the panel and try again.");
 }
 
 async function writeStockState(state: StockState, etag?: string) {

@@ -1,4 +1,15 @@
-import { BlobError, BlobPreconditionFailedError, get, head, put } from "@vercel/blob";
+import {
+  BlobAccessError,
+  BlobClientTokenExpiredError,
+  BlobError,
+  BlobNotFoundError,
+  BlobPreconditionFailedError,
+  BlobStoreNotFoundError,
+  BlobStoreSuspendedError,
+  get,
+  head,
+  put,
+} from "@vercel/blob";
 import { teamsMock } from "../../public/camisetas/mock";
 import { CATALOG_STATE_VERSION, createCatalogState, type CatalogState } from "@/lib/catalog";
 
@@ -24,44 +35,49 @@ function parseCatalogState(value: unknown): CatalogState {
 
 async function readCatalogDocument(): Promise<{ state: CatalogState; etag?: string }> {
   const token = getBlobToken();
-  let result;
-  let access: "private" | "public" = "private";
 
   try {
-    result = await get(CATALOG_BLOB_PATH, { access: "private", useCache: false, token });
+    const result = await get(CATALOG_BLOB_PATH, { access: "private", useCache: false, token });
+    if (!result) return { state: createCatalogState(teamsMock) };
+    const metadata = await head(CATALOG_BLOB_PATH, { token });
+    return { state: parseCatalogState(await new Response(result.stream).json()), etag: metadata.etag };
   } catch (error) {
+    if (error instanceof BlobNotFoundError) return { state: createCatalogState(teamsMock) };
     if (!(error instanceof BlobError)) {
-      throw new Error(
-        "No se pudo leer el Blob del catálogo. Verificá que BLOB_READ_WRITE_TOKEN pertenezca al Blob Store de este proyecto y tenga permisos de lectura.",
-        { cause: error },
-      );
+      throw new Error("No se pudo leer el Blob del catálogo por un problema transitorio de red. Intentá nuevamente.", {
+        cause: error,
+      });
     }
-
-    try {
-      // Existing catalog documents were public. Keep them readable while the next write migrates them.
-      access = "public";
-      result = await get(CATALOG_BLOB_PATH, { access: "public", useCache: false, token });
-    } catch (fallbackError) {
-      throw new Error(
-        "No se pudo leer el Blob del catálogo por falta de permisos. Verificá que BLOB_READ_WRITE_TOKEN pertenezca al Blob Store de este proyecto y tenga permisos de lectura.",
-        { cause: fallbackError },
-      );
+    if (
+      error instanceof BlobAccessError ||
+      error instanceof BlobClientTokenExpiredError ||
+      error instanceof BlobStoreNotFoundError ||
+      error instanceof BlobStoreSuspendedError
+    ) {
+      throw new Error("No se pudo leer el Blob del catálogo por falta de permisos. Verificá la configuración del Blob Store.", {
+        cause: error,
+      });
     }
   }
 
-  if (!result) return { state: createCatalogState(teamsMock) };
-
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const before = await head(CATALOG_BLOB_PATH, { token });
-    const current = await get(CATALOG_BLOB_PATH, { access, useCache: false, token });
-    const after = await head(CATALOG_BLOB_PATH, { token });
-    if (before.etag === after.etag) {
-      if (!current) continue;
-      return { state: parseCatalogState(await new Response(current.stream).json()), etag: after.etag };
+  try {
+    const metadata = await head(CATALOG_BLOB_PATH, { token });
+    const response = await fetch(metadata.url, { cache: "no-store" });
+    if (response.status === 404) return { state: createCatalogState(teamsMock) };
+    if (response.status === 401 || response.status === 403) {
+      throw new Error("No se pudo leer el Blob del catálogo por falta de permisos.");
     }
+    if (!response.ok) throw new Error("public-read-failed");
+    return { state: parseCatalogState(await response.json()), etag: metadata.etag };
+  } catch (error) {
+    if (error instanceof BlobNotFoundError) return { state: createCatalogState(teamsMock) };
+    if (error instanceof Error && error.message === "No se pudo leer el Blob del catálogo por falta de permisos.") {
+      throw error;
+    }
+    throw new Error("No se pudo leer el Blob del catálogo por un problema transitorio de red. Intentá nuevamente.", {
+      cause: error,
+    });
   }
-
-  throw new Error("No se pudo obtener una lectura estable del Blob del catálogo. Recargá el panel e intentá nuevamente.");
 }
 
 export async function readCatalogState() {
