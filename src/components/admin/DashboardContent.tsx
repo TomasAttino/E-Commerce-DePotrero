@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
-import { createCatalogProduct, createCatalogTeam, saveCatalogProduct } from "@/app/actions/catalog";
+import { createCatalogProduct, createCatalogTeam, saveCatalogProduct, type CatalogActionResult } from "@/app/actions/catalog";
 import { exhaustStockProduct, toggleStockSize } from "@/app/actions/stock";
 import { paginate, filterCatalogProducts, type CatalogState } from "@/lib/catalog";
 import { resolveProductStock, type StockState, type TeamWithStock } from "@/lib/stock";
@@ -35,6 +35,8 @@ export default function DashboardContent({
   const [newTeamOpen, setNewTeamOpen] = useState(false);
   const [newProductOpen, setNewProductOpen] = useState(false);
   const savingProductIds = useRef(new Set<string>());
+  const catalogVersion = useRef(initialCatalog.version);
+  const catalogMutationQueue = useRef(Promise.resolve());
 
   const filtered = useMemo(() => paginate(filterCatalogProducts(catalog, query, teamFilter), page), [catalog, page, query, teamFilter]);
   const stockById = useMemo(() => new Map(teams.flatMap((team) => team.products.map((product) => [product.id, product]))), [teams]);
@@ -43,19 +45,39 @@ export default function DashboardContent({
     setFeedback(result);
   }
 
+  function applyCatalogState(state: CatalogState) {
+    catalogVersion.current = state.version;
+    setCatalog(state);
+    setTeams(state.teams.map((team) => ({ ...team, products: team.products.map((product) => resolveProductStock(product, stock)) })));
+  }
+
+  function enqueueCatalogMutation(mutation: (version: number) => Promise<CatalogActionResult>) {
+    const operation = catalogMutationQueue.current.then(async () => {
+      try {
+        const result = await mutation(catalogVersion.current);
+        if (result.status === "success") applyCatalogState(result.state);
+        show({ status: result.status, message: result.message });
+        return result;
+      } catch (error) {
+        const result = { status: "error" as const, message: error instanceof Error ? error.message : "No se pudo guardar el cambio." };
+        show(result);
+        return result;
+      }
+    });
+    catalogMutationQueue.current = operation.then(() => undefined, () => undefined);
+    return operation;
+  }
+
   async function saveProduct(productId: string, form: HTMLFormElement) {
     if (savingProductIds.current.has(productId)) return;
     savingProductIds.current.add(productId);
     const submitButton = form.querySelector("button[type=submit], button:not([type])") as HTMLButtonElement | null;
     submitButton?.setAttribute("disabled", "");
-    show({ status: "pending", message: "Guardando producto..." });
     try {
-      const result = await saveCatalogProduct(productId, new FormData(form), catalog.version);
-      if (result.status === "success") {
-        setCatalog(result.state);
-        setTeams(result.state.teams.map((team) => ({ ...team, products: team.products.map((product) => resolveProductStock(product, stock)) })));
-      }
-      show({ status: result.status, message: result.message });
+      await enqueueCatalogMutation(async (version) => {
+        show({ status: "pending", message: "Guardando producto..." });
+        return saveCatalogProduct(productId, new FormData(form), version);
+      });
     } finally {
       savingProductIds.current.delete(productId);
       submitButton?.removeAttribute("disabled");
@@ -64,29 +86,29 @@ export default function DashboardContent({
 
   async function submitNewTeam(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    show({ status: "pending", message: "Guardando equipo..." });
-    const result = await createCatalogTeam(new FormData(event.currentTarget), catalog.version);
+    const form = event.currentTarget;
+    const result = await enqueueCatalogMutation(async (version) => {
+      show({ status: "pending", message: "Guardando equipo..." });
+      return createCatalogTeam(new FormData(form), version);
+    });
     if (result.status === "success") {
-      setCatalog(result.state);
-      setTeams(result.state.teams.map((team) => ({ ...team, products: team.products.map((product) => resolveProductStock(product, stock)) })));
-      event.currentTarget.reset();
+      form.reset();
       setNewTeamOpen(false);
     }
-    show({ status: result.status, message: result.message });
   }
 
   async function submitNewProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    show({ status: "pending", message: "Subiendo imagen y guardando producto..." });
-    const result = await createCatalogProduct(new FormData(event.currentTarget), catalog.version);
+    const form = event.currentTarget;
+    const result = await enqueueCatalogMutation(async (version) => {
+      show({ status: "pending", message: "Subiendo imagen y guardando producto..." });
+      return createCatalogProduct(new FormData(form), version);
+    });
     if (result.status === "success") {
-      setCatalog(result.state);
-      setTeams(result.state.teams.map((team) => ({ ...team, products: team.products.map((product) => resolveProductStock(product, stock)) })));
-      event.currentTarget.reset();
+      form.reset();
       setNewProductOpen(false);
       setPage(1);
     }
-    show({ status: result.status, message: result.message });
   }
 
   async function changeSize(productId: string, size: string) {
