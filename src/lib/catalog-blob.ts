@@ -1,4 +1,4 @@
-import { BlobAccessError, get, put } from "@vercel/blob";
+import { BlobError, get, put } from "@vercel/blob";
 import { teamsMock } from "../../public/camisetas/mock";
 import { CATALOG_STATE_VERSION, createCatalogState, type CatalogState } from "@/lib/catalog";
 
@@ -29,7 +29,7 @@ async function readCatalogDocument(): Promise<{ state: CatalogState; etag?: stri
   try {
     result = await get(CATALOG_BLOB_PATH, { access: "private", useCache: false, token });
   } catch (error) {
-    if (!(error instanceof BlobAccessError)) {
+    if (!(error instanceof BlobError)) {
       throw new Error(
         "No se pudo leer el Blob del catálogo. Verificá que BLOB_READ_WRITE_TOKEN pertenezca al Blob Store de este proyecto y tenga permisos de lectura.",
         { cause: error },

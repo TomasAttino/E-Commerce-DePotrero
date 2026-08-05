@@ -1,4 +1,4 @@
-import { BlobAccessError, get, put } from "@vercel/blob";
+import { BlobError, get, put } from "@vercel/blob";
 import { emptyStockState, STOCK_STATE_VERSION, type StockState } from "@/lib/stock";
 
 export const STOCK_BLOB_PATH = "camisetas/stock/state-v1.json";
@@ -46,7 +46,7 @@ async function readStockDocument(): Promise<{ state: StockState; etag?: string }
   try {
     result = await get(STOCK_BLOB_PATH, { access: "private", useCache: false, token });
   } catch (error) {
-    if (!(error instanceof BlobAccessError)) {
+    if (!(error instanceof BlobError)) {
       throw new Error(
         "Could not read the stock Blob. Verify that BLOB_READ_WRITE_TOKEN belongs to this project's Blob Store and has read permission.",
         { cause: error },
