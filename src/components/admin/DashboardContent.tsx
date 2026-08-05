@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createCatalogProduct, createCatalogTeam, saveCatalogProduct } from "@/app/actions/catalog";
 import { exhaustStockProduct, toggleStockSize } from "@/app/actions/stock";
 import { paginate, filterCatalogProducts, type CatalogState } from "@/lib/catalog";
@@ -34,6 +34,7 @@ export default function DashboardContent({
   const [feedback, setFeedback] = useState<Feedback>({ status: "success", message: "" });
   const [newTeamOpen, setNewTeamOpen] = useState(false);
   const [newProductOpen, setNewProductOpen] = useState(false);
+  const savingProductIds = useRef(new Set<string>());
 
   const filtered = useMemo(() => paginate(filterCatalogProducts(catalog, query, teamFilter), page), [catalog, page, query, teamFilter]);
   const stockById = useMemo(() => new Map(teams.flatMap((team) => team.products.map((product) => [product.id, product]))), [teams]);
@@ -43,13 +44,22 @@ export default function DashboardContent({
   }
 
   async function saveProduct(productId: string, form: HTMLFormElement) {
+    if (savingProductIds.current.has(productId)) return;
+    savingProductIds.current.add(productId);
+    const submitButton = form.querySelector("button[type=submit], button:not([type])") as HTMLButtonElement | null;
+    submitButton?.setAttribute("disabled", "");
     show({ status: "pending", message: "Guardando producto..." });
-    const result = await saveCatalogProduct(productId, new FormData(form), catalog.version);
-    if (result.status === "success") {
-      setCatalog(result.state);
-      setTeams(result.state.teams.map((team) => ({ ...team, products: team.products.map((product) => resolveProductStock(product, stock)) })));
+    try {
+      const result = await saveCatalogProduct(productId, new FormData(form), catalog.version);
+      if (result.status === "success") {
+        setCatalog(result.state);
+        setTeams(result.state.teams.map((team) => ({ ...team, products: team.products.map((product) => resolveProductStock(product, stock)) })));
+      }
+      show({ status: result.status, message: result.message });
+    } finally {
+      savingProductIds.current.delete(productId);
+      submitButton?.removeAttribute("disabled");
     }
-    show({ status: result.status, message: result.message });
   }
 
   async function submitNewTeam(event: React.FormEvent<HTMLFormElement>) {

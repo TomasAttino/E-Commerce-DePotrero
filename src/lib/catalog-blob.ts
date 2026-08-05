@@ -1,4 +1,4 @@
-import { BlobError, get, put } from "@vercel/blob";
+import { BlobError, BlobPreconditionFailedError, get, head, put } from "@vercel/blob";
 import { teamsMock } from "../../public/camisetas/mock";
 import { CATALOG_STATE_VERSION, createCatalogState, type CatalogState } from "@/lib/catalog";
 
@@ -25,6 +25,7 @@ function parseCatalogState(value: unknown): CatalogState {
 async function readCatalogDocument(): Promise<{ state: CatalogState; etag?: string }> {
   const token = getBlobToken();
   let result;
+  let access: "private" | "public" = "private";
 
   try {
     result = await get(CATALOG_BLOB_PATH, { access: "private", useCache: false, token });
@@ -38,6 +39,7 @@ async function readCatalogDocument(): Promise<{ state: CatalogState; etag?: stri
 
     try {
       // Existing catalog documents were public. Keep them readable while the next write migrates them.
+      access = "public";
       result = await get(CATALOG_BLOB_PATH, { access: "public", useCache: false, token });
     } catch (fallbackError) {
       throw new Error(
@@ -48,10 +50,18 @@ async function readCatalogDocument(): Promise<{ state: CatalogState; etag?: stri
   }
 
   if (!result) return { state: createCatalogState(teamsMock) };
-  return {
-    state: parseCatalogState(await new Response(result.stream).json()),
-    etag: result.blob.etag,
-  };
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const before = await head(CATALOG_BLOB_PATH, { token });
+    const current = await get(CATALOG_BLOB_PATH, { access, useCache: false, token });
+    const after = await head(CATALOG_BLOB_PATH, { token });
+    if (before.etag === after.etag) {
+      if (!current) continue;
+      return { state: parseCatalogState(await new Response(current.stream).json()), etag: after.etag };
+    }
+  }
+
+  throw new Error("No se pudo obtener una lectura estable del Blob del catálogo. Recargá el panel e intentá nuevamente.");
 }
 
 export async function readCatalogState() {
@@ -81,7 +91,14 @@ export async function updateCatalogState(expectedVersion: number, update: (state
       version: current.version + 1,
       updatedAt: new Date().toISOString(),
     };
-    await writeCatalogState(state, etag);
+    try {
+      await writeCatalogState(state, etag);
+    } catch (error) {
+      if (error instanceof BlobPreconditionFailedError) {
+        throw new Error("El catálogo cambió en otra sesión. Recargá el panel e intentá nuevamente.", { cause: error });
+      }
+      throw error;
+    }
     return state;
   });
   writeQueue = operation.then(() => undefined, () => undefined);

@@ -1,4 +1,4 @@
-import { BlobError, get, put } from "@vercel/blob";
+import { BlobError, BlobPreconditionFailedError, get, head, put } from "@vercel/blob";
 import { emptyStockState, STOCK_STATE_VERSION, type StockState } from "@/lib/stock";
 
 export const STOCK_BLOB_PATH = "camisetas/stock/state-v1.json";
@@ -42,6 +42,7 @@ export async function readStockState(): Promise<StockState> {
 async function readStockDocument(): Promise<{ state: StockState; etag?: string }> {
   const token = getBlobToken();
   let result;
+  let access: "private" | "public" = "private";
 
   try {
     result = await get(STOCK_BLOB_PATH, { access: "private", useCache: false, token });
@@ -55,6 +56,7 @@ async function readStockDocument(): Promise<{ state: StockState; etag?: string }
 
     try {
       // Existing stock documents were public. Keep them readable while the next write migrates them.
+      access = "public";
       result = await get(STOCK_BLOB_PATH, { access: "public", useCache: false, token });
     } catch (fallbackError) {
       throw new Error(
@@ -65,10 +67,18 @@ async function readStockDocument(): Promise<{ state: StockState; etag?: string }
   }
 
   if (!result) return { state: emptyStockState() };
-  return {
-    state: parseStockState(await new Response(result.stream).json()),
-    etag: result.blob.etag,
-  };
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const before = await head(STOCK_BLOB_PATH, { token });
+    const current = await get(STOCK_BLOB_PATH, { access, useCache: false, token });
+    const after = await head(STOCK_BLOB_PATH, { token });
+    if (before.etag === after.etag) {
+      if (!current) continue;
+      return { state: parseStockState(await new Response(current.stream).json()), etag: after.etag };
+    }
+  }
+
+  throw new Error("Could not obtain a stable read of the stock Blob. Reload the panel and try again.");
 }
 
 async function writeStockState(state: StockState, etag?: string) {
@@ -102,7 +112,14 @@ export async function updateStockState(
     };
     // Existing documents use ETag preconditions. Creation has no ETag to compare,
     // so the first concurrent creation remains protected only by the logical version.
-    await writeStockState(state, etag);
+    try {
+      await writeStockState(state, etag);
+    } catch (error) {
+      if (error instanceof BlobPreconditionFailedError) {
+        throw new Error("El stock cambió en otra sesión. Recargá el panel e intentá nuevamente.", { cause: error });
+      }
+      throw error;
+    }
     return state;
   });
 
