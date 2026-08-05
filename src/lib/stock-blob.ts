@@ -74,7 +74,7 @@ async function readStockDocument(): Promise<{ state: StockState; etag?: string }
 async function writeStockState(state: StockState, etag?: string) {
   const token = getBlobToken();
   await put(STOCK_BLOB_PATH, JSON.stringify(state), {
-    access: "private",
+    access: "public",
     addRandomSuffix: false,
     allowOverwrite: Boolean(etag),
     contentType: "application/json",

@@ -61,7 +61,7 @@ export async function readCatalogState() {
 async function writeCatalogState(state: CatalogState, etag?: string) {
   const token = getBlobToken();
   await put(CATALOG_BLOB_PATH, JSON.stringify(state), {
-    access: "private",
+    access: "public",
     addRandomSuffix: false,
     allowOverwrite: Boolean(etag),
     contentType: "application/json",
