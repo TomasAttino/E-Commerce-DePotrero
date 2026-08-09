@@ -10,9 +10,13 @@ import {
   updateCatalogProduct,
 } from "./catalog.ts";
 import { emptyStockState, resolveProductStock, toggleProductSize } from "./stock.ts";
+import { isStateVersionBehind } from "./blob-version.ts";
 
 const initial = createCatalogState(teamsMock);
 assert.equal(initial.teams.length, teamsMock.length);
+assert.equal(isStateVersionBehind(3, 4), true);
+assert.equal(isStateVersionBehind(4, 4), false);
+assert.equal(isStateVersionBehind(5, 4), false);
 
 const withTeam = addCatalogTeam(initial, {
   id: "nuevo-equipo",

@@ -11,6 +11,7 @@ import {
   put,
 } from "@vercel/blob";
 import { emptyStockState, STOCK_STATE_VERSION, type StockState } from "@/lib/stock";
+import { isStateVersionBehind } from "@/lib/blob-version";
 
 export const STOCK_BLOB_PATH = "camisetas/stock/state-v1.json";
 
@@ -79,7 +80,9 @@ async function readStockDocument(): Promise<{ state: StockState; etag?: string }
 
   try {
     const metadata = await head(STOCK_BLOB_PATH, { token });
-    const response = await fetch(metadata.url, { cache: "no-store" });
+    const url = new URL(metadata.url);
+    url.searchParams.set("etag", metadata.etag);
+    const response = await fetch(url, { cache: "no-store" });
     if (response.status === 404) return { state: emptyStockState() };
     if (response.status === 401 || response.status === 403) {
       throw new Error("Could not read the stock Blob because of a permission or Blob Store configuration problem.");
@@ -120,6 +123,12 @@ export async function updateStockState(
     let preconditionError: BlobPreconditionFailedError | undefined;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const { state: current, etag } = await readStockDocument();
+      if (isStateVersionBehind(current.version, expectedVersion)) {
+        if (attempt === 0) continue;
+        throw new Error(
+          "Could not confirm the current stock version. This is a temporary consistency problem; try again.",
+        );
+      }
       if (attempt === 0 && current.version !== expectedVersion) continue;
 
       const next = update(current);

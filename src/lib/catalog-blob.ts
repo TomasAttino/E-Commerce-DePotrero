@@ -12,6 +12,7 @@ import {
 } from "@vercel/blob";
 import { teamsMock } from "../../public/camisetas/mock";
 import { CATALOG_STATE_VERSION, createCatalogState, type CatalogState } from "@/lib/catalog";
+import { isStateVersionBehind } from "@/lib/blob-version";
 
 export const CATALOG_BLOB_PATH = "camisetas/catalog/state-v1.json";
 
@@ -61,7 +62,9 @@ async function readCatalogDocument(): Promise<{ state: CatalogState; etag?: stri
 
   try {
     const metadata = await head(CATALOG_BLOB_PATH, { token });
-    const response = await fetch(metadata.url, { cache: "no-store" });
+    const url = new URL(metadata.url);
+    url.searchParams.set("etag", metadata.etag);
+    const response = await fetch(url, { cache: "no-store" });
     if (response.status === 404) return { state: createCatalogState(teamsMock) };
     if (response.status === 401 || response.status === 403) {
       throw new Error("No se pudo leer el Blob del catálogo por falta de permisos.");
@@ -100,6 +103,12 @@ export async function updateCatalogState(expectedVersion: number, update: (state
     let preconditionError: BlobPreconditionFailedError | undefined;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const { state: current, etag } = await readCatalogDocument();
+      if (isStateVersionBehind(current.version, expectedVersion)) {
+        if (attempt === 0) continue;
+        throw new Error(
+          "No se pudo confirmar la versión actual del catálogo. Es un problema transitorio de consistencia; intentá nuevamente.",
+        );
+      }
       if (attempt === 0 && current.version !== expectedVersion) continue;
       const next = update(current);
       const state: CatalogState = {

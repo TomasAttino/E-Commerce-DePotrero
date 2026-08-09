@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { teamsMock } from "../../public/camisetas/mock.ts";
 import { resolveTeamsStock, resolveUnavailableTeamsStock, emptyStockState } from "./stock.ts";
+import { isStateVersionBehind } from "./blob-version.ts";
+
+assert.equal(isStateVersionBehind(3, 4), true);
+assert.equal(isStateVersionBehind(4, 4), false);
+assert.equal(isStateVersionBehind(5, 4), false);
 
 const verified = resolveTeamsStock(teamsMock, {
   ...emptyStockState(),
