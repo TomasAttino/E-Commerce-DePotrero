@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 export default function Hero() {
   return (
@@ -21,19 +22,13 @@ export default function Hero() {
         <p className="text-xl md:text-2xl font-light text-zinc-300 max-w-2xl mx-auto">
           Colecciones exclusivas de los mejores equipos del fútbol argentino.
         </p>
-        <div className="pt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <a 
-            href="#river" 
-            className="w-full sm:w-auto bg-white text-black px-8 py-4 text-sm font-bold uppercase tracking-widest hover:bg-zinc-200 transition-colors"
+        <div className="pt-8">
+          <Link
+            href="/catalogo"
+            className="inline-flex bg-white px-8 py-4 text-sm font-bold uppercase tracking-widest text-black transition-colors hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
           >
-            Ver River
-          </a>
-          <a 
-            href="#boca" 
-            className="w-full sm:w-auto border border-white text-white px-8 py-4 text-sm font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-colors"
-          >
-            Ver Boca
-          </a>
+            Explorar catálogo
+          </Link>
         </div>
       </div>
     </section>

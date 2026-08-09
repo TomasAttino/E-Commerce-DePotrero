@@ -8,6 +8,7 @@ import CartDrawer from "@/components/CartDrawer";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import type { TeamWithStock } from "@/lib/stock";
 import Image from "next/image";
+import { SlidersHorizontal } from "lucide-react";
 
 type CatalogProduct = TeamWithStock["products"][number] & { teamName: string; teamSlug: string };
 const PRODUCTS_PER_PAGE = 24;
@@ -26,6 +27,7 @@ export default function CatalogContent({
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [includeSoldOut, setIncludeSoldOut] = useState(true);
   const [page, setPage] = useState(1);
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
   const products = useMemo<CatalogProduct[]>(
     () => {
@@ -84,7 +86,18 @@ export default function CatalogContent({
           <p className="mt-4 text-sm text-zinc-400 sm:text-base">Encontrá camisetas y próximos productos de todos los equipos en un solo lugar.</p>
         </div>
 
-        <div className="mb-10 space-y-5 border-y border-white/10 py-5" aria-label="Filtros del catálogo">
+         <button
+           type="button"
+           className="mb-5 inline-flex items-center gap-2 border border-white/20 bg-zinc-950 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:border-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:hidden"
+           aria-expanded={isFiltersOpen}
+           aria-controls="catalog-filters"
+           onClick={() => setIsFiltersOpen((current) => !current)}
+         >
+           <SlidersHorizontal aria-hidden="true" size={16} />
+           Filtros
+         </button>
+
+         <div id="catalog-filters" className={`${isFiltersOpen ? "block" : "hidden"} mb-10 space-y-5 border-y border-white/10 py-5 md:block`} aria-label="Filtros del catálogo">
           <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_1fr_1fr]">
             <div>
               <label htmlFor="catalog-search" className="mb-2 block text-xs font-bold uppercase tracking-widest text-zinc-400">Buscar</label>
@@ -136,9 +149,9 @@ export default function CatalogContent({
           {selectedSizes.length > 0 && <span>Mostrando productos con al menos uno de los talles seleccionados</span>}
         </div>
         {filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-             {visibleProducts.map((product) => <div key={product.id}><ProductCard product={product} teamName={product.teamName} /></div>)}
-          </div>
+           <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 scroll-smooth sm:-mx-6 sm:px-6 md:mx-0 md:grid md:grid-cols-2 md:gap-6 md:overflow-visible md:px-0 md:pb-0 lg:grid-cols-3 xl:grid-cols-4" role="region" aria-label="Productos del catálogo">
+              {visibleProducts.map((product) => <div key={product.id} className="w-[calc(100vw-2rem)] shrink-0 snap-start sm:w-[calc(100vw-3rem)] md:w-auto md:shrink"><ProductCard product={product} teamName={product.teamName} /></div>)}
+           </div>
         ) : (
           <p className="border border-dashed border-white/15 px-6 py-16 text-center text-sm text-zinc-500">No encontramos productos con esos filtros.</p>
         )}
@@ -154,7 +167,6 @@ export default function CatalogContent({
         )}
       </section>
       <footer
-  id="privacy"
   className="relative overflow-hidden border-t border-white/10 bg-black py-14"
 >
   {/* Resplandor verde detrás del logo */}
@@ -166,13 +178,13 @@ export default function CatalogContent({
 
   <div className="relative mx-auto max-w-7xl px-4">
     {/* Logo */}
-    <div className="flex justify-center">
+    <div className="relative mx-auto h-56 w-56 sm:h-64 sm:w-64">
       <Image
         src="/isologo2.png"
         alt="DePotrero"
-        width={512}
-        height={512}
-        className="h-auto w-44 object-contain sm:w-52"
+        fill
+        sizes="(max-width: 640px) 224px, 256px"
+        className="object-contain"
       />
     </div>
 
@@ -205,8 +217,9 @@ export default function CatalogContent({
     <div className="mx-auto mt-10 max-w-3xl border-t border-white/10 pt-6">
       <p className="text-center text-xs leading-5 text-zinc-600">
         © 2026 DePotrero. Todos los derechos reservados.
-        <br className="sm:hidden" /> <br></br>
-        Desarrollado por <span className="text-lime-400">Tomas Attino Castro</span>.
+       <br className="sm:hidden" />
+       <span className="hidden sm:inline"> · </span>
+       Desarrollado por <span className="text-lime-400">Tomas Attino Castro</span>.
       </p>
     </div>
   </div>

@@ -36,8 +36,8 @@ export default function Header({
   return (
     <header className="fixed inset-x-0 top-[34px] z-[70] border-b border-white/10 bg-black/50 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="/#hero" className="relative block h-10 w-28 shrink-0 sm:h-12 sm:w-36" aria-label="DePotrero, ir al inicio">
-          <Image src="/isologo.png" alt="DePotrero" fill sizes="(max-width: 640px) 112px, 144px" className="object-contain object-center" priority />
+        <Link href="/#hero" className="relative block h-11 w-32 shrink-0 sm:h-14 sm:w-40" aria-label="DePotrero, ir al inicio">
+          <Image src="/isologo.png" alt="DePotrero" fill sizes="(max-width: 640px) 128px, 160px" className="object-contain object-center" priority />
         </Link>
         
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-zinc-300" aria-label="Navegación principal">

@@ -8,6 +8,7 @@ import CartDrawer from "@/components/CartDrawer";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import LeadCaptureModal from "@/components/LeadCaptureModal";
 import type { TeamWithStock } from "@/lib/stock";
+import Image from "next/image";
 
 export default function HomeContent({ teams, catalogFallback }: { teams: TeamWithStock[]; catalogFallback?: boolean }) {
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -20,15 +21,7 @@ export default function HomeContent({ teams, catalogFallback }: { teams: TeamWit
       
       <Hero />
       
-      <section className="border-y border-white/10 px-4 py-24 text-center sm:px-6" aria-labelledby="catalog-preview-title">
-        <p className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-zinc-500">Toda la colección</p>
-        <h2 id="catalog-preview-title" className="text-4xl font-black uppercase italic tracking-tighter sm:text-6xl">Todos los equipos. Un solo catálogo.</h2>
-        <p className="mx-auto mt-5 max-w-xl text-sm text-zinc-400">Filtrá por equipo, tipo, talle o disponibilidad y encontrá tu próxima camiseta.</p>
-        <a href="/catalogo" className="mt-8 inline-flex bg-white px-8 py-4 text-sm font-bold uppercase tracking-widest text-black transition-colors hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Explorar catálogo</a>
-      </section>
-
       <footer
-  id="privacy"
   className="relative overflow-hidden border-t border-white/10 bg-black py-14"
 >
   {/* Resplandor verde detrás del logo */}
@@ -40,11 +33,13 @@ export default function HomeContent({ teams, catalogFallback }: { teams: TeamWit
 
   <div className="relative mx-auto max-w-7xl px-4">
     {/* Logo */}
-    <div className="flex justify-center">
-      <img
+    <div className="relative mx-auto h-56 w-56 sm:h-64 sm:w-64">
+      <Image
         src="/isologo2.png"
         alt="DePotrero"
-        className="h-auto w-44 object-contain sm:w-52"
+        fill
+        sizes="(max-width: 640px) 224px, 256px"
+        className="object-contain"
       />
     </div>
 
@@ -72,21 +67,15 @@ export default function HomeContent({ teams, catalogFallback }: { teams: TeamWit
         Camisetas
       </a>
 
-      <a
-        href="#privacy"
-        className="text-zinc-400 transition hover:text-lime-400"
-      >
-        Privacidad
-      </a>
     </div>
 
     {/* Línea inferior */}
     <div className="mx-auto mt-10 max-w-3xl border-t border-white/10 pt-6">
       <p className="text-center text-xs leading-5 text-zinc-600">
-        © 2026 DePotrero. Todos los derechos reservados.
-        <br className="sm:hidden" />
-        <span className="hidden sm:inline"> · </span>
-        Tus datos se utilizan únicamente para gestionar tu compra.
+         © 2026 DePotrero. Todos los derechos reservados.
+         <br className="sm:hidden" />
+         <span className="hidden sm:inline"> · </span>
+         Desarrollado por <span className="text-lime-400">Tomas Attino Castro</span>.
       </p>
     </div>
   </div>

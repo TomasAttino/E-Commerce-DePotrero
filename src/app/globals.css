@@ -22,6 +22,26 @@
   }
 }
 
+@keyframes promo-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.promo-marquee-track {
+  animation: promo-marquee 22s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .promo-marquee-viewport {
+    overflow-x: auto;
+  }
+
+  .promo-marquee-track {
+    animation: none;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
