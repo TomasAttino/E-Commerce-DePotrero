@@ -98,24 +98,29 @@ async function writeCatalogState(state: CatalogState, etag?: string) {
 
 export async function updateCatalogState(expectedVersion: number, update: (state: CatalogState) => CatalogState) {
   const operation = writeQueue.then(async () => {
-    const { state: current, etag } = await readCatalogDocument();
-    if (current.version !== expectedVersion) throw new Error("El catálogo cambió en otra sesión. Recargá el panel e intentá nuevamente.");
-    const next = update(current);
-    const state: CatalogState = {
-      ...next,
-      schemaVersion: CATALOG_STATE_VERSION,
-      version: current.version + 1,
-      updatedAt: new Date().toISOString(),
-    };
-    try {
-      await writeCatalogState(state, etag);
-    } catch (error) {
-      if (error instanceof BlobPreconditionFailedError) {
-        throw new Error("El catálogo cambió en otra sesión. Recargá el panel e intentá nuevamente.", { cause: error });
+    let preconditionError: BlobPreconditionFailedError | undefined;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const { state: current, etag } = await readCatalogDocument();
+      if (attempt === 0 && current.version !== expectedVersion) continue;
+      const next = update(current);
+      const state: CatalogState = {
+        ...next,
+        schemaVersion: CATALOG_STATE_VERSION,
+        version: current.version + 1,
+        updatedAt: new Date().toISOString(),
+      };
+      try {
+        await writeCatalogState(state, etag);
+        return state;
+      } catch (error) {
+        if (error instanceof BlobPreconditionFailedError) {
+          preconditionError = error;
+          continue;
+        }
+        throw error;
       }
-      throw error;
     }
-    return state;
+    throw new Error("El catálogo cambió en otra sesión. Recargá el panel e intentá nuevamente.", { cause: preconditionError });
   });
   writeQueue = operation.then(() => undefined, () => undefined);
   return operation;

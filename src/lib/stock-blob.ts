@@ -117,29 +117,32 @@ export async function updateStockState(
   update: (state: StockState) => StockState,
 ): Promise<StockState> {
   const operation = writeQueue.then(async () => {
-    const { state: current, etag } = await readStockDocument();
-    if (current.version !== expectedVersion) {
-      throw new Error("El stock cambió en otra sesión. Recargá el panel e intentá nuevamente.");
-    }
+    let preconditionError: BlobPreconditionFailedError | undefined;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const { state: current, etag } = await readStockDocument();
+      if (attempt === 0 && current.version !== expectedVersion) continue;
 
-    const next = update(current);
-    const state = {
-      ...next,
-      schemaVersion: STOCK_STATE_VERSION as 1,
-      version: current.version + 1,
-      updatedAt: new Date().toISOString(),
-    };
-    // Existing documents use ETag preconditions. Creation has no ETag to compare,
-    // so the first concurrent creation remains protected only by the logical version.
-    try {
-      await writeStockState(state, etag);
-    } catch (error) {
-      if (error instanceof BlobPreconditionFailedError) {
-        throw new Error("El stock cambió en otra sesión. Recargá el panel e intentá nuevamente.", { cause: error });
+      const next = update(current);
+      const state = {
+        ...next,
+        schemaVersion: STOCK_STATE_VERSION as 1,
+        version: current.version + 1,
+        updatedAt: new Date().toISOString(),
+      };
+      // Existing documents use ETag preconditions. Creation has no ETag to compare,
+      // so the first concurrent creation remains protected only by the logical version.
+      try {
+        await writeStockState(state, etag);
+        return state;
+      } catch (error) {
+        if (error instanceof BlobPreconditionFailedError) {
+          preconditionError = error;
+          continue;
+        }
+        throw error;
       }
-      throw error;
     }
-    return state;
+    throw new Error("El stock cambió en otra sesión. Recargá el panel e intentá nuevamente.", { cause: preconditionError });
   });
 
   writeQueue = operation.then(() => undefined, () => undefined);
