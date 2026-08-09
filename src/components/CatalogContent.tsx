@@ -14,12 +14,10 @@ const PRODUCTS_PER_PAGE = 24;
 
 export default function CatalogContent({
   teams,
-  stockError,
-  catalogError,
+  catalogFallback,
 }: {
   teams: TeamWithStock[];
-  stockError?: string;
-  catalogError?: string;
+  catalogFallback?: boolean;
 }) {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -55,8 +53,10 @@ export default function CatalogContent({
         .some((value) => value.toLowerCase().includes(normalizedQuery));
       const matchesTeam = teamFilter === "all" || product.teamSlug === teamFilter;
       const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
-      const matchesSizes = selectedSizes.length === 0 || selectedSizes.some((size) => product.availableSizes.includes(size));
-      const matchesStock = includeSoldOut || product.inStock;
+      const matchesSizes = selectedSizes.length === 0 || selectedSizes.some((size) =>
+        (product.stockVerified ? product.availableSizes : product.sizes).includes(size),
+      );
+      const matchesStock = includeSoldOut || !product.stockVerified || product.inStock;
       return matchesQuery && matchesTeam && matchesCategory && matchesSizes && matchesStock;
     });
   }, [categoryFilter, includeSoldOut, products, query, selectedSizes, teamFilter]);
@@ -77,12 +77,7 @@ export default function CatalogContent({
       <PromoBar />
        <Header onCartClick={() => setIsCartOpen(true)} />
       <section className="mx-auto max-w-7xl px-4 pb-16 pt-32 sm:px-6 lg:px-8" aria-labelledby="catalog-title">
-        {stockError && (
-          <div role="alert" className="mb-8 border border-red-400/30 bg-red-400/10 px-4 py-3 text-center text-xs text-red-200">
-            No se puede verificar el stock persistente. Las compras están temporalmente deshabilitadas.
-          </div>
-        )}
-        {catalogError && <div role="status" className="mb-8 border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-center text-xs text-amber-200">Se está mostrando el catálogo inicial mientras se recupera el catálogo editable.</div>}
+        {catalogFallback && <div role="status" className="mb-8 border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-center text-xs text-amber-200">Se está mostrando la colección inicial por el momento.</div>}
         <div className="mb-10 max-w-3xl">
           <p className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-zinc-500">Colección completa</p>
           <h1 id="catalog-title" className="text-4xl font-black uppercase italic tracking-tighter sm:text-6xl">Catálogo</h1>

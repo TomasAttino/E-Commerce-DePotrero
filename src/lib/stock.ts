@@ -17,6 +17,7 @@ export type StockState = {
 export type ProductWithStock = Product & {
   availableSizes: string[];
   unavailableSizes: string[];
+  stockVerified: boolean;
 };
 
 export type TeamWithStock = Omit<Team, "products"> & {
@@ -34,12 +35,13 @@ export function emptyStockState(): StockState {
 
 export function resolveUnavailableTeamsStock(teams: Team[]): TeamWithStock[] {
   return teams.map((team) => ({
-    ...team,
-    products: team.products.map((product) => ({
-      ...product,
+      ...team,
+      products: team.products.map((product) => ({
+        ...product,
       inStock: false,
       availableSizes: [],
       unavailableSizes: [...product.sizes],
+      stockVerified: false,
     })),
   }));
 }
@@ -60,6 +62,7 @@ export function resolveProductStock(
     availableSizes,
     unavailableSizes,
     inStock: availableSizes.length > 0,
+    stockVerified: true,
   };
 }
 
