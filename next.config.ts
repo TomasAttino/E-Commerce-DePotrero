@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
     localPatterns: [
       { pathname: '/camisetas/**' },
       { pathname: '/isologo.png' },
+      { pathname: '/isologo2.png' },
     ],
     remotePatterns: [
       { protocol: 'https', hostname: 'i.pinimg.com' },

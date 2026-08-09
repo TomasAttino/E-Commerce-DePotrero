@@ -36,8 +36,16 @@ export default function Header({
   return (
     <header className="fixed inset-x-0 top-[34px] z-[70] border-b border-white/10 bg-black/50 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="/#hero" className="relative block h-11 w-32 shrink-0 sm:h-14 sm:w-40" aria-label="DePotrero, ir al inicio">
-          <Image src="/isologo.png" alt="DePotrero" fill sizes="(max-width: 640px) 128px, 160px" className="object-contain object-center" priority />
+        <Link href="/#hero" className="relative block h-16 w-32 shrink-0 sm:w-40" aria-label="DePotrero, ir al inicio">
+          <Image
+            src="/isologo.png"
+            alt="DePotrero"
+            width={144}
+            height={144}
+            sizes="(max-width: 640px) 128px, 144px"
+            className="absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 object-contain sm:h-36 sm:w-36"
+            priority
+          />
         </Link>
         
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-zinc-300" aria-label="Navegación principal">

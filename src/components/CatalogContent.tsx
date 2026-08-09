@@ -149,9 +149,9 @@ export default function CatalogContent({
           {selectedSizes.length > 0 && <span>Mostrando productos con al menos uno de los talles seleccionados</span>}
         </div>
         {filteredProducts.length > 0 ? (
-           <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 scroll-smooth sm:-mx-6 sm:px-6 md:mx-0 md:grid md:grid-cols-2 md:gap-6 md:overflow-visible md:px-0 md:pb-0 lg:grid-cols-3 xl:grid-cols-4" role="region" aria-label="Productos del catálogo">
-              {visibleProducts.map((product) => <div key={product.id} className="w-[calc(100vw-2rem)] shrink-0 snap-start sm:w-[calc(100vw-3rem)] md:w-auto md:shrink"><ProductCard product={product} teamName={product.teamName} /></div>)}
-           </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-2 md:gap-6 lg:grid-cols-3 xl:grid-cols-4" role="region" aria-label="Productos del catálogo">
+               {visibleProducts.map((product) => <div key={product.id} className="min-w-0"><ProductCard product={product} teamName={product.teamName} /></div>)}
+            </div>
         ) : (
           <p className="border border-dashed border-white/15 px-6 py-16 text-center text-sm text-zinc-500">No encontramos productos con esos filtros.</p>
         )}
