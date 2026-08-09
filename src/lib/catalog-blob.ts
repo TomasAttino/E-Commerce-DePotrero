@@ -39,8 +39,7 @@ async function readCatalogDocument(): Promise<{ state: CatalogState; etag?: stri
   try {
     const result = await get(CATALOG_BLOB_PATH, { access: "private", useCache: false, token });
     if (!result) return { state: createCatalogState(teamsMock) };
-    const metadata = await head(CATALOG_BLOB_PATH, { token });
-    return { state: parseCatalogState(await new Response(result.stream).json()), etag: metadata.etag };
+    return { state: parseCatalogState(await new Response(result.stream).json()), etag: result.blob.etag };
   } catch (error) {
     if (error instanceof BlobNotFoundError) return { state: createCatalogState(teamsMock) };
     if (!(error instanceof BlobError)) {

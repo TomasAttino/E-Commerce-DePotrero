@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { Pencil } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import { createCatalogProduct, createCatalogTeam, saveCatalogProduct, type CatalogActionResult } from "@/app/actions/catalog";
+import { createCatalogProduct, createCatalogTeam, deleteCatalogProduct, saveCatalogProduct, type CatalogActionResult } from "@/app/actions/catalog";
 import { exhaustStockProduct, toggleStockSize } from "@/app/actions/stock";
 import { paginate, filterCatalogProducts, type CatalogState } from "@/lib/catalog";
 import { resolveProductStock, type StockState, type TeamWithStock } from "@/lib/stock";
@@ -28,7 +28,7 @@ export default function DashboardContent({
 }) {
   const [catalog, setCatalog] = useState(initialCatalog);
   const [teams, setTeams] = useState(initialTeams);
-  const [stock, setStock] = useState(initialStock);
+  const [, setStock] = useState(initialStock);
   const [query, setQuery] = useState("");
   const [teamFilter, setTeamFilter] = useState("all");
   const [page, setPage] = useState(1);
@@ -38,6 +38,7 @@ export default function DashboardContent({
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const savingProductIds = useRef(new Set<string>());
   const catalogVersion = useRef(initialCatalog.version);
+  const stockRef = useRef(initialStock);
   const catalogMutationQueue = useRef(Promise.resolve());
 
   const filtered = useMemo(() => paginate(filterCatalogProducts(catalog, query, teamFilter), page), [catalog, page, query, teamFilter]);
@@ -50,7 +51,12 @@ export default function DashboardContent({
   function applyCatalogState(state: CatalogState) {
     catalogVersion.current = state.version;
     setCatalog(state);
-    setTeams(state.teams.map((team) => ({ ...team, products: team.products.map((product) => resolveProductStock(product, stock)) })));
+    setTeams(state.teams.map((team) => ({ ...team, products: team.products.map((product) => resolveProductStock(product, stockRef.current)) })));
+  }
+
+  function setCurrentStock(next: StockState) {
+    stockRef.current = next;
+    setStock(next);
   }
 
   function enqueueCatalogMutation(mutation: (version: number) => Promise<CatalogActionResult>) {
@@ -71,6 +77,7 @@ export default function DashboardContent({
   }
 
   async function saveProduct(productId: string, form: HTMLFormElement) {
+    const submittedData = new FormData(form);
     if (savingProductIds.current.has(productId)) return;
     savingProductIds.current.add(productId);
     const submitButton = form.querySelector("button[type=submit], button:not([type])") as HTMLButtonElement | null;
@@ -78,7 +85,7 @@ export default function DashboardContent({
     try {
       const result = await enqueueCatalogMutation(async (version) => {
         show({ status: "pending", message: "Guardando producto..." });
-        return saveCatalogProduct(productId, new FormData(form), version);
+        return saveCatalogProduct(productId, submittedData, version);
       });
       if (result.status === "success") setEditingProductId(null);
     } finally {
@@ -87,12 +94,28 @@ export default function DashboardContent({
     }
   }
 
+  async function deleteProduct(productId: string, productName: string) {
+    if (savingProductIds.current.has(productId)) return;
+    if (!window.confirm(`¿Eliminar el producto "${productName}"? Esta acción no se puede deshacer.`)) return;
+    savingProductIds.current.add(productId);
+    try {
+      const result = await enqueueCatalogMutation(async (version) => {
+        show({ status: "pending", message: "Eliminando producto..." });
+        return deleteCatalogProduct(productId, version);
+      });
+      if (result.status === "success" && editingProductId === productId) setEditingProductId(null);
+    } finally {
+      savingProductIds.current.delete(productId);
+    }
+  }
+
   async function submitNewTeam(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
+    const submittedData = new FormData(form);
     const result = await enqueueCatalogMutation(async (version) => {
       show({ status: "pending", message: "Guardando equipo..." });
-      return createCatalogTeam(new FormData(form), version);
+      return createCatalogTeam(submittedData, version);
     });
     if (result.status === "success") {
       form.reset();
@@ -103,9 +126,10 @@ export default function DashboardContent({
   async function submitNewProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
+    const submittedData = new FormData(form);
     const result = await enqueueCatalogMutation(async (version) => {
       show({ status: "pending", message: "Subiendo imagen y guardando producto..." });
-      return createCatalogProduct(new FormData(form), version);
+      return createCatalogProduct(submittedData, version);
     });
     if (result.status === "success") {
       form.reset();
@@ -117,15 +141,16 @@ export default function DashboardContent({
   async function changeSize(productId: string, size: string) {
     const product = stockById.get(productId);
     if (!product) return;
-    const previous = stock;
-    const next = { ...stock, products: { ...stock.products, [productId]: { exhausted: false, unavailableSizes: resolveProductStock(product, stock).availableSizes.includes(size) ? [...resolveProductStock(product, stock).unavailableSizes, size] : resolveProductStock(product, stock).unavailableSizes.filter((item) => item !== size) } } };
-    setStock(next);
+    const previous = stockRef.current;
+    const resolved = resolveProductStock(product, previous);
+    const next = { ...previous, products: { ...previous.products, [productId]: { exhausted: false, unavailableSizes: resolved.availableSizes.includes(size) ? [...resolved.unavailableSizes, size] : resolved.unavailableSizes.filter((item) => item !== size) } } };
+    setCurrentStock(next);
     setTeams((current) => current.map((team) => ({ ...team, products: team.products.map((item) => item.id === productId ? resolveProductStock(item, next) : item) })));
     show({ status: "pending", message: "Guardando stock..." });
     const result = await toggleStockSize(productId, size, previous.version);
-    if (result.status === "success") setStock(result.state);
+    if (result.status === "success") setCurrentStock(result.state);
     else {
-      setStock(previous);
+      setCurrentStock(previous);
       setTeams((current) => current.map((team) => ({ ...team, products: team.products.map((item) => item.id === productId ? resolveProductStock(item, previous) : item) })));
     }
     show({ status: result.status, message: result.message });
@@ -134,14 +159,14 @@ export default function DashboardContent({
   async function exhaustModel(productId: string) {
     const product = stockById.get(productId);
     if (!product) return;
-    const previous = stock;
-    const next = { ...stock, products: { ...stock.products, [productId]: { exhausted: true, unavailableSizes: [] } } };
-    setStock(next);
+    const previous = stockRef.current;
+    const next = { ...previous, products: { ...previous.products, [productId]: { exhausted: true, unavailableSizes: [] } } };
+    setCurrentStock(next);
     setTeams((current) => current.map((team) => ({ ...team, products: team.products.map((item) => item.id === productId ? resolveProductStock(item, next) : item) })));
     show({ status: "pending", message: "Guardando stock..." });
     const result = await exhaustStockProduct(productId, previous.version);
-    if (result.status === "success") setStock(result.state);
-    else { setStock(previous); setTeams((current) => current.map((team) => ({ ...team, products: team.products.map((item) => item.id === productId ? resolveProductStock(item, previous) : item) }))); }
+    if (result.status === "success") setCurrentStock(result.state);
+    else { setCurrentStock(previous); setTeams((current) => current.map((team) => ({ ...team, products: team.products.map((item) => item.id === productId ? resolveProductStock(item, previous) : item) }))); }
     show({ status: result.status, message: result.message });
   }
 
@@ -171,10 +196,12 @@ export default function DashboardContent({
             <div><label className="text-[10px] uppercase text-zinc-500">Año / temporada</label><input name="year" defaultValue={product.year ?? ""} placeholder="Ej. 2025/26" className="mt-1 w-full border border-white/10 bg-black px-3 py-2 text-sm" /></div>
             <div><label className="text-[10px] uppercase text-zinc-500">Precio</label><input name="price" required type="number" min="0" defaultValue={product.price} className="mt-1 w-full border border-white/10 bg-black px-3 py-2 text-sm" /></div>
             <div><label className="text-[10px] uppercase text-zinc-500">Equipo</label><select name="teamId" defaultValue={team.id} className="mt-1 w-full border border-white/10 bg-black px-3 py-2 text-sm">{catalog.teams.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}</select></div>
-            <label className="text-xs text-zinc-500 md:col-span-3">Reemplazar imagen (opcional)<input name="image" type="file" accept="image/*" className="mt-1 block w-full text-xs" /></label>
+            <div><label className="text-[10px] uppercase text-zinc-500">Categoría</label><input name="category" required defaultValue={product.category} className="mt-1 w-full border border-white/10 bg-black px-3 py-2 text-sm" /></div>
+            <div><label className="text-[10px] uppercase text-zinc-500">Talles</label><input name="sizes" required defaultValue={product.sizes.join(", ")} className="mt-1 w-full border border-white/10 bg-black px-3 py-2 text-sm" /></div>
+            <label className="text-xs text-zinc-500 md:col-span-2">Reemplazar imagen (opcional)<input name="image" type="file" accept="image/*" className="mt-1 block w-full text-xs" /></label>
             <div className="flex items-end gap-2"><button type="submit" className="bg-white px-3 py-2 text-xs font-bold uppercase text-black">Guardar cambios</button><button type="button" onClick={() => setEditingProductId(null)} className="border border-white/20 px-3 py-2 text-xs font-bold uppercase">Cancelar</button></div>
           </form> : <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-bold">{product.name}</h2><p className="text-xs text-zinc-500">{product.id}</p></div><button type="button" onClick={() => setEditingProductId(product.id)} aria-label={`Editar ${product.name}`} title={`Editar ${product.name}`} className="border border-white/20 p-2 text-zinc-300 hover:border-white hover:text-white"><Pencil size={16} aria-hidden="true" /></button></div>
+            <div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-bold">{product.name}</h2><p className="text-xs text-zinc-500">{product.id}</p></div><div className="flex gap-2"><button type="button" onClick={() => setEditingProductId(product.id)} aria-label={`Editar ${product.name}`} title={`Editar ${product.name}`} className="border border-white/20 p-2 text-zinc-300 hover:border-white hover:text-white"><Pencil size={16} aria-hidden="true" /></button><button type="button" onClick={() => void deleteProduct(product.id, product.name)} aria-label={`Eliminar ${product.name}`} title={`Eliminar ${product.name}`} className="border border-red-400/40 p-2 text-red-300 hover:border-red-300 hover:text-red-200"><Trash2 size={16} aria-hidden="true" /></button></div></div>
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3"><div><dt className="text-[10px] uppercase text-zinc-500">Año / temporada</dt><dd>{product.year ?? "Sin especificar"}</dd></div><div><dt className="text-[10px] uppercase text-zinc-500">Precio</dt><dd>${product.price}</dd></div><div><dt className="text-[10px] uppercase text-zinc-500">Equipo</dt><dd>{team.name}</dd></div></dl>
           </div>}
         </div>

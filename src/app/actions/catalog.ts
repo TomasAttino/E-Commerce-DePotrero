@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import {
   addCatalogProduct,
   addCatalogTeam,
+  deleteCatalogProduct as removeCatalogProduct,
   updateCatalogProduct,
   type CatalogState,
 } from "@/lib/catalog";
@@ -67,17 +68,33 @@ export async function saveCatalogProduct(productId: string, formData: FormData, 
   try {
     const image = formData.get("image");
     const imageUrl = fileIsImage(image) ? await uploadImage(image) : undefined;
-    const state = await updateCatalogState(expectedVersion, (current) => updateCatalogProduct(current, productId, {
+    const productUpdate = {
       name: text(formData.get("name"), "El nombre"),
       year: optionalText(formData.get("year")),
       price: positivePrice(formData.get("price")),
       teamId: text(formData.get("teamId"), "El equipo"),
+      category: text(formData.get("category"), "La categoría"),
+      sizes: sizes(formData.get("sizes")),
       ...(imageUrl ? { image: imageUrl } : {}),
+    };
+    const state = await updateCatalogState(expectedVersion, (current) => updateCatalogProduct(current, productId, {
+      ...productUpdate,
     }));
     revalidateCatalog();
     return { status: "success", message: "Producto guardado.", state };
   } catch (error) {
     return { status: "error", message: error instanceof Error ? error.message : "No se pudo guardar el producto." };
+  }
+}
+
+export async function deleteCatalogProduct(productId: string, expectedVersion: number): Promise<CatalogActionResult> {
+  await requireAdmin();
+  try {
+    const state = await updateCatalogState(expectedVersion, (current) => removeCatalogProduct(current, productId));
+    revalidateCatalog();
+    return { status: "success", message: "Producto eliminado.", state };
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : "No se pudo eliminar el producto." };
   }
 }
 

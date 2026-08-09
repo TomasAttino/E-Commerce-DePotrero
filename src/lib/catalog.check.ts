@@ -4,6 +4,7 @@ import {
   addCatalogProduct,
   addCatalogTeam,
   createCatalogState,
+  deleteCatalogProduct,
   filterCatalogProducts,
   paginate,
   updateCatalogProduct,
@@ -39,6 +40,10 @@ assert.equal(paginate(Array.from({ length: 25 }, (_, index) => index), 2).items.
 
 const product = edited.teams.find((team) => team.id === "boca")!.products.find((item) => item.id === newProduct.id)!;
 assert.equal(product.year, "2026");
+const deleted = deleteCatalogProduct(edited, newProduct.id);
+assert.equal(deleted.teams.find((team) => team.id === "boca")?.products.some((item) => item.id === newProduct.id), false);
+assert.equal(deleted.teams.length, edited.teams.length);
+assert.throws(() => deleteCatalogProduct(edited, "missing-product"), /no existe/);
 const stock = toggleProductSize(emptyStockState(), product, "M");
 assert.deepEqual(resolveProductStock(product, stock).availableSizes, ["L"]);
 

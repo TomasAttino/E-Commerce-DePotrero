@@ -60,6 +60,17 @@ export function updateCatalogProduct(
   };
 }
 
+export function deleteCatalogProduct(state: CatalogState, productId: string): CatalogState {
+  if (!findCatalogProduct(state, productId)) throw new Error("El producto no existe en el catálogo público.");
+  return {
+    ...state,
+    teams: state.teams.map((team) => ({
+      ...team,
+      products: team.products.filter((product) => product.id !== productId),
+    })),
+  };
+}
+
 export function addCatalogTeam(state: CatalogState, team: Team): CatalogState {
   if (state.teams.some((item) => item.id === team.id || item.slug === team.slug)) {
     throw new Error("Ya existe un equipo con ese ID o slug.");
