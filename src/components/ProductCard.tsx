@@ -19,7 +19,7 @@ export default function ProductCard({ product, teamName }: { product: ProductWit
     <div 
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-       className={`flex-none w-full bg-zinc-900/50 group/card border border-white/5 overflow-hidden transition-opacity ${isExhausted ? 'opacity-60' : ''}`}
+       className={`flex-none w-full min-w-0 bg-zinc-900/50 group/card border border-white/5 overflow-hidden transition-opacity ${isExhausted ? 'opacity-60' : ''}`}
     >
       <div className="relative aspect-[4/5] overflow-hidden bg-transparent">
         <Image
@@ -32,12 +32,12 @@ export default function ProductCard({ product, teamName }: { product: ProductWit
           className="object-cover transition-transform duration-500 group-hover/card:scale-110"
         />
         {isExhausted && (
-          <div className="absolute top-4 right-4 bg-red-600 text-white text-[10px] font-black px-2 py-1 uppercase tracking-tighter">
+          <div className="absolute top-2 right-2 max-w-[90%] bg-red-600 text-white text-[9px] sm:text-[10px] font-black px-1.5 sm:px-2 py-1 uppercase tracking-tighter text-right sm:top-4 sm:right-4">
              Sin stock
           </div>
         )}
         {isUnknown && (
-          <div className="absolute top-4 right-4 bg-zinc-700 text-zinc-100 text-[10px] font-black px-2 py-1 uppercase tracking-tighter">
+          <div className="absolute top-2 right-2 max-w-[90%] bg-zinc-700 text-zinc-100 text-[9px] sm:text-[10px] font-black px-1.5 sm:px-2 py-1 uppercase tracking-tighter text-right sm:top-4 sm:right-4">
             Disponibilidad a confirmar
           </div>
         )}
@@ -52,26 +52,26 @@ export default function ProductCard({ product, teamName }: { product: ProductWit
               <Plus size={24} />
             </button>
           ) : isExhausted ? (
-            <span className="bg-zinc-800 text-zinc-400 px-4 py-2 font-bold uppercase text-xs">Sin stock</span>
+            <span className="max-w-[90%] bg-zinc-800 text-zinc-400 px-3 sm:px-4 py-2 font-bold uppercase text-[10px] sm:text-xs text-center">Sin stock</span>
           ) : (
-            <span className="bg-zinc-800 text-zinc-300 px-4 py-2 font-bold uppercase text-xs">Disponibilidad a confirmar</span>
+            <span className="max-w-[90%] bg-zinc-800 text-zinc-300 px-3 sm:px-4 py-2 font-bold uppercase text-[10px] sm:text-xs text-center">Disponibilidad a confirmar</span>
           )}
         </div>
       </div>
       
-      <div className="p-4 space-y-4">
-        <div className="flex justify-between items-start">
-          <div className="flex-1 min-w-0 mr-2">
-            <h3 className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest">{teamName ? `${teamName} · ` : ""}{product.category}</h3>
-            <h2 className="text-base font-bold break-words uppercase tracking-tighter">{product.name}</h2>
-            {product.year && <p className="text-xs text-zinc-400">Año: {product.year}</p>}
-            <p className="text-xl font-black mt-1">${product.price.toLocaleString('es-AR')}</p>
+      <div className="p-3 space-y-3 sm:p-4 sm:space-y-4">
+        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:justify-between sm:items-start sm:gap-0">
+          <div className="flex-1 min-w-0 sm:mr-2">
+            <h3 className="text-[9px] sm:text-[10px] font-medium text-zinc-500 uppercase tracking-widest break-words [overflow-wrap:anywhere]">{teamName ? `${teamName} · ` : ""}{product.category}</h3>
+            <h2 className="text-sm sm:text-base font-bold break-words [overflow-wrap:anywhere] uppercase tracking-tighter">{product.name}</h2>
+            {product.year && <p className="text-[11px] sm:text-xs text-zinc-400 break-words">Año: {product.year}</p>}
+            <p className="text-lg sm:text-xl font-black mt-1 break-words">${product.price.toLocaleString('es-AR')}</p>
           </div>
           <button 
             // Y le sacamos el selectedColor de acá también
             onClick={() => addToCart(product, selectedSize)}
              disabled={!isAvailable}
-             className={`px-4 py-2 text-[11px] font-black uppercase tracking-tighter transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
+             className={`w-full sm:w-auto shrink-0 px-3 sm:px-4 py-2 text-[10px] sm:text-[11px] leading-tight font-black uppercase tracking-tighter transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
                isAvailable
                ? 'bg-white text-black hover:bg-zinc-200'
                : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
