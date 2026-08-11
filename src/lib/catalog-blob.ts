@@ -6,7 +6,6 @@ import {
   BlobPreconditionFailedError,
   BlobStoreNotFoundError,
   BlobStoreSuspendedError,
-  get,
   head,
   put,
 } from "@vercel/blob";
@@ -38,29 +37,6 @@ async function readCatalogDocument(): Promise<{ state: CatalogState; etag?: stri
   const token = getBlobToken();
 
   try {
-    const result = await get(CATALOG_BLOB_PATH, { access: "private", useCache: false, token });
-    if (!result) return { state: createCatalogState(teamsMock) };
-    return { state: parseCatalogState(await new Response(result.stream).json()), etag: result.blob.etag };
-  } catch (error) {
-    if (error instanceof BlobNotFoundError) return { state: createCatalogState(teamsMock) };
-    if (!(error instanceof BlobError)) {
-      throw new Error("No se pudo leer el Blob del catálogo por un problema transitorio de red. Intentá nuevamente.", {
-        cause: error,
-      });
-    }
-    if (
-      error instanceof BlobAccessError ||
-      error instanceof BlobClientTokenExpiredError ||
-      error instanceof BlobStoreNotFoundError ||
-      error instanceof BlobStoreSuspendedError
-    ) {
-      throw new Error("No se pudo leer el Blob del catálogo por falta de permisos. Verificá la configuración del Blob Store.", {
-        cause: error,
-      });
-    }
-  }
-
-  try {
     const metadata = await head(CATALOG_BLOB_PATH, { token });
     const url = new URL(metadata.url);
     url.searchParams.set("etag", metadata.etag);
@@ -75,6 +51,21 @@ async function readCatalogDocument(): Promise<{ state: CatalogState; etag?: stri
     if (error instanceof BlobNotFoundError) return { state: createCatalogState(teamsMock) };
     if (error instanceof Error && error.message === "No se pudo leer el Blob del catálogo por falta de permisos.") {
       throw error;
+    }
+    if (!(error instanceof BlobError)) {
+      throw new Error("No se pudo leer el Blob del catálogo por un problema transitorio de red. Intentá nuevamente.", {
+        cause: error,
+      });
+    }
+    if (
+      error instanceof BlobAccessError ||
+      error instanceof BlobClientTokenExpiredError ||
+      error instanceof BlobStoreNotFoundError ||
+      error instanceof BlobStoreSuspendedError
+    ) {
+      throw new Error("No se pudo leer el Blob del catálogo por falta de permisos. Verificá la configuración del Blob Store.", {
+        cause: error,
+      });
     }
     throw new Error("No se pudo leer el Blob del catálogo por un problema transitorio de red. Intentá nuevamente.", {
       cause: error,

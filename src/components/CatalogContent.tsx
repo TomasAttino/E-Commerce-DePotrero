@@ -6,6 +6,7 @@ import PromoBar from "@/components/PromoBar";
 import ProductCard from "@/components/ProductCard";
 import CartDrawer from "@/components/CartDrawer";
 import WhatsAppButton from "@/components/WhatsAppButton";
+import { selectNewCatalogProducts } from "@/lib/catalog";
 import type { TeamWithStock } from "@/lib/stock";
 import Image from "next/image";
 import { SlidersHorizontal } from "lucide-react";
@@ -46,6 +47,7 @@ export default function CatalogContent({
     [teams],
   );
   const categories = useMemo(() => [...new Set(products.map((product) => product.category))].sort(), [products]);
+  const newProducts = useMemo(() => selectNewCatalogProducts(products), [products]);
   const sizes = useMemo(() => [...new Set(products.flatMap((product) => product.sizes))].sort(), [products]);
   const filteredProducts = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -77,16 +79,31 @@ export default function CatalogContent({
   return (
     <main className="min-h-screen bg-black text-white selection:bg-white selection:text-black">
       <PromoBar />
-       <Header onCartClick={() => setIsCartOpen(true)} />
+       <Header
+         onCartClick={() => setIsCartOpen(true)}
+         teamOptions={teams}
+         selectedTeam={teamFilter}
+         onTeamSelect={(teamSlug) => { setTeamFilter(teamSlug); resetPage(); }}
+       />
       <section className="mx-auto max-w-7xl px-4 pb-16 pt-32 sm:px-6 lg:px-8" aria-labelledby="catalog-title">
         {catalogFallback && <div role="status" className="mb-8 border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-center text-xs text-amber-200">Se está mostrando la colección inicial por el momento.</div>}
         <div className="mb-10 max-w-3xl">
           <p className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-zinc-500">Colección completa</p>
           <h1 id="catalog-title" className="text-4xl font-black uppercase italic tracking-tighter sm:text-6xl">Catálogo</h1>
-          <p className="mt-4 text-sm text-zinc-400 sm:text-base">Encontrá camisetas y próximos productos de todos los equipos en un solo lugar.</p>
-        </div>
+         <p className="mt-4 text-sm text-zinc-400 sm:text-base">Encontrá camisetas y próximos productos de todos los equipos en un solo lugar.</p>
+         </div>
 
-         <button
+         {newProducts.length > 0 && <section className="mb-12 border border-lime-400/30 bg-lime-400/5 p-4 sm:p-6" aria-labelledby="new-products-title">
+           <div className="mb-5 flex items-end justify-between gap-4">
+             <div><p className="mb-2 text-xs font-bold uppercase tracking-[0.3em] text-lime-300">Lo último</p><h2 id="new-products-title" className="text-2xl font-black uppercase italic tracking-tight sm:text-4xl">Recién llegados</h2></div>
+             <span className="text-xs text-zinc-400">{newProducts.length} {newProducts.length === 1 ? "producto" : "productos"}</span>
+           </div>
+           <div className="grid grid-cols-2 gap-3 md:grid-cols-2 md:gap-6 lg:grid-cols-3 xl:grid-cols-4" role="region" aria-label="Productos recién llegados">
+             {newProducts.map((product) => <div key={product.id} className="min-w-0"><ProductCard product={product} teamName={product.teamName} /></div>)}
+           </div>
+         </section>}
+
+          <button
            type="button"
            className="mb-5 inline-flex items-center gap-2 border border-white/20 bg-zinc-950 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:border-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:hidden"
            aria-expanded={isFiltersOpen}

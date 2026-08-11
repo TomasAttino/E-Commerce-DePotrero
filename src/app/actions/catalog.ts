@@ -75,6 +75,7 @@ export async function saveCatalogProduct(productId: string, formData: FormData, 
       teamId: text(formData.get("teamId"), "El equipo"),
       category: text(formData.get("category"), "La categoría"),
       sizes: sizes(formData.get("sizes")),
+      isNew: formData.get("isNew") === "on",
       ...(imageUrl ? { image: imageUrl } : {}),
     };
     const state = await updateCatalogState(expectedVersion, (current) => updateCatalogProduct(current, productId, {
@@ -132,6 +133,7 @@ export async function createCatalogProduct(formData: FormData, expectedVersion: 
       image: await uploadImage(image),
       sizes: sizes(formData.get("sizes")),
       category: text(formData.get("category"), "La categoría"),
+      isNew: formData.get("isNew") === "on",
       inStock: true,
     };
     const state = await updateCatalogState(expectedVersion, (current) => addCatalogProduct(current, text(formData.get("teamId"), "El equipo"), product));

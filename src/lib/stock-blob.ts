@@ -6,7 +6,6 @@ import {
   BlobPreconditionFailedError,
   BlobStoreNotFoundError,
   BlobStoreSuspendedError,
-  get,
   head,
   put,
 } from "@vercel/blob";
@@ -55,30 +54,6 @@ async function readStockDocument(): Promise<{ state: StockState; etag?: string }
   const token = getBlobToken();
 
   try {
-    const result = await get(STOCK_BLOB_PATH, { access: "private", useCache: false, token });
-    if (!result) return { state: emptyStockState() };
-    const metadata = await head(STOCK_BLOB_PATH, { token });
-    return { state: parseStockState(await new Response(result.stream).json()), etag: metadata.etag };
-  } catch (error) {
-    if (error instanceof BlobNotFoundError) return { state: emptyStockState() };
-    if (!(error instanceof BlobError)) {
-      throw new Error("Could not read the stock Blob because of a temporary network problem. Try again.", {
-        cause: error,
-      });
-    }
-    if (
-      error instanceof BlobAccessError ||
-      error instanceof BlobClientTokenExpiredError ||
-      error instanceof BlobStoreNotFoundError ||
-      error instanceof BlobStoreSuspendedError
-    ) {
-      throw new Error("Could not read the stock Blob because of a permission or Blob Store configuration problem.", {
-        cause: error,
-      });
-    }
-  }
-
-  try {
     const metadata = await head(STOCK_BLOB_PATH, { token });
     const url = new URL(metadata.url);
     url.searchParams.set("etag", metadata.etag);
@@ -96,6 +71,21 @@ async function readStockDocument(): Promise<{ state: StockState; etag?: string }
       error.message === "Could not read the stock Blob because of a permission or Blob Store configuration problem."
     ) {
       throw error;
+    }
+    if (!(error instanceof BlobError)) {
+      throw new Error("Could not read the stock Blob because of a temporary network problem. Try again.", {
+        cause: error,
+      });
+    }
+    if (
+      error instanceof BlobAccessError ||
+      error instanceof BlobClientTokenExpiredError ||
+      error instanceof BlobStoreNotFoundError ||
+      error instanceof BlobStoreSuspendedError
+    ) {
+      throw new Error("Could not read the stock Blob because of a permission or Blob Store configuration problem.", {
+        cause: error,
+      });
     }
     throw new Error("Could not read the stock Blob because of a temporary network problem. Try again.", {
       cause: error,

@@ -38,7 +38,7 @@ export function findCatalogTeam(state: CatalogState, teamId: string) {
 export function updateCatalogProduct(
   state: CatalogState,
   productId: string,
-  update: Partial<Pick<Product, "name" | "year" | "price" | "category" | "image" | "hoverImage" | "sizes">> & { teamId?: string },
+  update: Partial<Pick<Product, "name" | "year" | "isNew" | "price" | "category" | "image" | "hoverImage" | "sizes">> & { teamId?: string },
 ): CatalogState {
   const current = flattenCatalog(state).find(({ product }) => product.id === productId);
   if (!current) throw new Error("El producto no existe en el catálogo público.");
@@ -58,6 +58,10 @@ export function updateCatalogProduct(
       ? { ...candidate, products: [...candidate.products, product] }
       : candidate),
   };
+}
+
+export function selectNewCatalogProducts<T extends { isNew?: boolean }>(products: T[]) {
+  return products.filter((product) => product.isNew === true);
 }
 
 export function deleteCatalogProduct(state: CatalogState, productId: string): CatalogState {

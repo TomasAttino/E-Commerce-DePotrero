@@ -6,10 +6,21 @@ import Link from "next/link";
 import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 
+type HeaderTeamOption = {
+  slug: string;
+  name: string;
+};
+
 export default function Header({
   onCartClick,
+  teamOptions,
+  onTeamSelect,
+  selectedTeam = "all",
 }: {
   onCartClick: () => void;
+  teamOptions?: HeaderTeamOption[];
+  onTeamSelect?: (teamSlug: string) => void;
+  selectedTeam?: string;
 }) {
   const { totalItems } = useCart();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -32,6 +43,11 @@ export default function Header({
   }, []);
 
   const closeMenu = () => setIsMenuOpen(false);
+  const hasTeamOptions = Boolean(teamOptions?.length);
+  const selectTeam = (teamSlug: string) => {
+    onTeamSelect?.(teamSlug);
+    closeMenu();
+  };
   
   return (
     <header className="fixed inset-x-0 top-[34px] z-[70] border-b border-white/10 bg-black/50 backdrop-blur-md">
@@ -115,20 +131,49 @@ export default function Header({
             className="absolute top-full left-0 right-0 z-10 max-h-[calc(100vh-98px)] overflow-y-auto border-t border-white/10 bg-black/95 p-4 shadow-2xl backdrop-blur-md md:hidden"
           >
             <ul className="space-y-1">
-              <li>
-                <Link
-                  href="/#hero"
-                  onClick={closeMenu}
-                  className="block px-4 py-3 text-sm font-medium text-zinc-200 hover:bg-white/10 hover:text-white transition-colors"
-                >
-                  Inicio
-                </Link>
-              </li>
-              <li>
-                <a href="/catalogo" onClick={closeMenu} className="block px-4 py-3 text-sm font-medium text-zinc-200 hover:bg-white/10 hover:text-white transition-colors">
-                  Catálogo
-                </a>
-              </li>
+              {hasTeamOptions ? (
+                <>
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => selectTeam("all")}
+                      aria-pressed={selectedTeam === "all"}
+                      className={`block w-full px-4 py-3 text-left text-sm font-medium transition-colors hover:bg-white/10 hover:text-white ${selectedTeam === "all" ? "bg-white/10 text-white" : "text-zinc-200"}`}
+                    >
+                      Todos los equipos
+                    </button>
+                  </li>
+                  {teamOptions?.map((team) => (
+                    <li key={team.slug}>
+                      <button
+                        type="button"
+                        onClick={() => selectTeam(team.slug)}
+                        aria-pressed={selectedTeam === team.slug}
+                        className={`block w-full px-4 py-3 text-left text-sm font-medium transition-colors hover:bg-white/10 hover:text-white ${selectedTeam === team.slug ? "bg-white/10 text-white" : "text-zinc-200"}`}
+                      >
+                        {team.name}
+                      </button>
+                    </li>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <li>
+                    <Link
+                      href="/#hero"
+                      onClick={closeMenu}
+                      className="block px-4 py-3 text-sm font-medium text-zinc-200 hover:bg-white/10 hover:text-white transition-colors"
+                    >
+                      Inicio
+                    </Link>
+                  </li>
+                  <li>
+                    <a href="/catalogo" onClick={closeMenu} className="block px-4 py-3 text-sm font-medium text-zinc-200 hover:bg-white/10 hover:text-white transition-colors">
+                      Catálogo
+                    </a>
+                  </li>
+                </>
+              )}
             </ul>
           </nav>
         </>

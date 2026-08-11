@@ -2,6 +2,7 @@ export interface Product {
   id: string;
   name: string;
   year?: string;
+  isNew?: boolean;
   price: number;
   image: string;
   hoverImage?: string;

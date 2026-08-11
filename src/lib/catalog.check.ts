@@ -7,6 +7,7 @@ import {
   deleteCatalogProduct,
   filterCatalogProducts,
   paginate,
+  selectNewCatalogProducts,
   updateCatalogProduct,
 } from "./catalog.ts";
 import { emptyStockState, resolveProductStock, toggleProductSize } from "./stock.ts";
@@ -35,15 +36,19 @@ const newProduct = {
   sizes: ["M", "L"],
   category: "Buzos",
   inStock: true,
+  isNew: true,
 };
 const withProduct = addCatalogProduct(withTeam, "nuevo-equipo", newProduct);
-const edited = updateCatalogProduct(withProduct, newProduct.id, { name: "Buzo Editado", year: "2026", price: 35000, teamId: "boca" });
+assert.equal(withProduct.teams.find((team) => team.id === "nuevo-equipo")?.products[0].isNew, true);
+const edited = updateCatalogProduct(withProduct, newProduct.id, { name: "Buzo Editado", year: "2026", price: 35000, isNew: false, teamId: "boca" });
 assert.equal(edited.teams.find((team) => team.id === "boca")?.products.some((product) => product.id === newProduct.id), true);
 assert.equal(filterCatalogProducts(edited, "editado", "boca").length, 1);
 assert.equal(paginate(Array.from({ length: 25 }, (_, index) => index), 2).items.length, 1);
 
 const product = edited.teams.find((team) => team.id === "boca")!.products.find((item) => item.id === newProduct.id)!;
 assert.equal(product.year, "2026");
+assert.equal(product.isNew, false);
+assert.deepEqual(selectNewCatalogProducts([newProduct, product]).map((item) => item.id), [newProduct.id]);
 const deleted = deleteCatalogProduct(edited, newProduct.id);
 assert.equal(deleted.teams.find((team) => team.id === "boca")?.products.some((item) => item.id === newProduct.id), false);
 assert.equal(deleted.teams.length, edited.teams.length);
