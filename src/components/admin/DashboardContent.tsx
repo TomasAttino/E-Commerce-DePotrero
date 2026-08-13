@@ -13,23 +13,56 @@ type Feedback = { status: "success" | "error" | "pending"; message: string };
 
 type GalleryItem = { type: "url" | "file"; value: string | number; label: string };
 
+const MAX_GALLERY_UPLOAD_BYTES = 16 * 1024 * 1024;
+const IMAGE_PREPARATION_THRESHOLD = 2 * 1024 * 1024;
+const MAX_IMAGE_DIMENSION = 2400;
+
+async function prepareImage(file: File) {
+  if (file.type === "image/svg+xml" || file.size <= IMAGE_PREPARATION_THRESHOLD) return file;
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+
+    const preserveTransparency = file.type === "image/png" || file.type === "image/webp";
+    const outputType = preserveTransparency ? "image/webp" : "image/jpeg";
+    const extension = preserveTransparency ? "webp" : "jpg";
+    const baseName = file.name.replace(/\.[^.]+$/, "") || "image";
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, outputType, 0.82));
+    return blob ? new File([blob], `${baseName}.${extension}`, { type: outputType }) : file;
+  } catch {
+    return file;
+  }
+}
+
 function GalleryEditor({ gallery, required = false }: { gallery: string[]; required?: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<GalleryItem[]>(gallery.map((url) => ({ type: "url", value: url, label: url })));
   const [error, setError] = useState("");
 
-  function updateFiles(files: File[]) {
+  async function updateFiles(files: File[]) {
     const currentFiles = Array.from(inputRef.current?.files ?? []);
     if (items.length + files.length > MAX_PRODUCT_IMAGES) {
       setError(`Un producto puede tener como máximo ${MAX_PRODUCT_IMAGES} imágenes.`);
       return;
     }
-    const next = [...items, ...files.map((file, index) => ({ type: "file" as const, value: currentFiles.length + index, label: file.name }))];
+    const preparedFiles = await Promise.all(files.map(prepareImage));
+    const nextFiles = [...currentFiles, ...preparedFiles];
+    if (nextFiles.reduce((total, file) => total + file.size, 0) > MAX_GALLERY_UPLOAD_BYTES) {
+      setError("Las imágenes seleccionadas superan el límite de 16 MB. Elegí archivos más chicos.");
+      return;
+    }
+    const next = [...items, ...preparedFiles.map((file, index) => ({ type: "file" as const, value: currentFiles.length + index, label: file.name }))];
     setItems(next);
     setError("");
     if (inputRef.current) {
       const dataTransfer = new DataTransfer();
-      [...currentFiles, ...files].forEach((file) => dataTransfer.items.add(file));
+      nextFiles.forEach((file) => dataTransfer.items.add(file));
       inputRef.current.files = dataTransfer.files;
     }
   }
