@@ -6,6 +6,7 @@ export interface Product {
   price: number;
   image: string;
   hoverImage?: string;
+  images?: string[];
   sizes: string[];
   category: string;
   inStock: boolean;

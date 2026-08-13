@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import type { ProductWithStock } from "@/lib/stock";
+import { getProductGallery } from "@/lib/catalog";
 import { useCart } from "@/context/CartContext";
 import { Plus } from "lucide-react";
 
@@ -14,6 +15,16 @@ export default function ProductCard({ product, teamName }: { product: ProductWit
   const isExhausted = product.stockVerified && !isAvailable;
   const [selectedSize, setSelectedSize] = useState(availableSizes[0] ?? product.sizes[0]);
   const [isHovered, setIsHovered] = useState(false);
+  const gallery = getProductGallery(product);
+  const [imageIndex, setImageIndex] = useState(0);
+  const hasGallery = gallery.length > 1;
+  const displayedImage = imageIndex === 0 && isHovered && product.hoverImage && !product.images?.length
+    ? product.hoverImage
+    : gallery[imageIndex];
+
+  function changeImage(direction: 1 | -1) {
+    setImageIndex((current) => (current + direction + gallery.length) % gallery.length);
+  }
 
   return (
     <div 
@@ -23,7 +34,7 @@ export default function ProductCard({ product, teamName }: { product: ProductWit
     >
       <div className="relative aspect-[4/5] overflow-hidden bg-transparent">
         <Image
-          src={(isHovered && product.hoverImage) ? product.hoverImage : product.image}
+          src={displayedImage}
           alt={product.name}
           fill
           sizes="(max-width: 767px) 280px, 320px"
@@ -31,6 +42,13 @@ export default function ProductCard({ product, teamName }: { product: ProductWit
           loading="lazy"
           className="object-cover transition-transform duration-500 group-hover/card:scale-110"
         />
+        {hasGallery && <>
+          <button type="button" onClick={() => changeImage(-1)} aria-label={`Imagen anterior de ${product.name}`} className="absolute left-2 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/60 px-2 py-1 text-lg text-white hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-white">‹</button>
+          <button type="button" onClick={() => changeImage(1)} aria-label={`Imagen siguiente de ${product.name}`} className="absolute right-2 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/60 px-2 py-1 text-lg text-white hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-white">›</button>
+          <div className="absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 gap-1" aria-label="Selector de imágenes">
+            {gallery.map((image, index) => <button key={`${image}-${index}`} type="button" onClick={() => setImageIndex(index)} aria-label={`Ver imagen ${index + 1} de ${gallery.length}`} aria-current={imageIndex === index} className={`h-1.5 w-1.5 rounded-full border border-white ${imageIndex === index ? "bg-white" : "bg-transparent"}`} />)}
+          </div>
+        </>}
         {isExhausted && (
           <div className="absolute top-2 right-2 max-w-[90%] bg-red-600 text-white text-[9px] sm:text-[10px] font-black px-1.5 sm:px-2 py-1 uppercase tracking-tighter text-right sm:top-4 sm:right-4">
              Sin stock

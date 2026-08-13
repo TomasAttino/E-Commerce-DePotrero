@@ -1,15 +1,75 @@
 "use client";
 
 import Image from "next/image";
-import { Pencil, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Pencil, Trash2, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { createCatalogProduct, createCatalogTeam, deleteCatalogProduct, saveCatalogProduct, type CatalogActionResult } from "@/app/actions/catalog";
 import { exhaustStockProduct, toggleStockSize } from "@/app/actions/stock";
-import { paginate, filterCatalogProducts, type CatalogState } from "@/lib/catalog";
+import { getProductGallery, MAX_PRODUCT_IMAGES, paginate, filterCatalogProducts, type CatalogState } from "@/lib/catalog";
 import { resolveProductStock, type StockState, type TeamWithStock } from "@/lib/stock";
 
 type Lead = { id: string; name: string; email: string; team: string; createdAt: Date };
 type Feedback = { status: "success" | "error" | "pending"; message: string };
+
+type GalleryItem = { type: "url" | "file"; value: string | number; label: string };
+
+function GalleryEditor({ gallery, required = false }: { gallery: string[]; required?: boolean }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [items, setItems] = useState<GalleryItem[]>(gallery.map((url) => ({ type: "url", value: url, label: url })));
+  const [error, setError] = useState("");
+
+  function updateFiles(files: File[]) {
+    const currentFiles = Array.from(inputRef.current?.files ?? []);
+    if (items.length + files.length > MAX_PRODUCT_IMAGES) {
+      setError(`Un producto puede tener como máximo ${MAX_PRODUCT_IMAGES} imágenes.`);
+      return;
+    }
+    const next = [...items, ...files.map((file, index) => ({ type: "file" as const, value: currentFiles.length + index, label: file.name }))];
+    setItems(next);
+    setError("");
+    if (inputRef.current) {
+      const dataTransfer = new DataTransfer();
+      [...currentFiles, ...files].forEach((file) => dataTransfer.items.add(file));
+      inputRef.current.files = dataTransfer.files;
+    }
+  }
+
+  function remove(index: number) {
+    const removed = items[index];
+    const remainingFiles = Array.from(inputRef.current?.files ?? []).filter((_, fileIndex) => fileIndex !== removed.value);
+    const next = items.filter((_, itemIndex) => itemIndex !== index).map((item) => item.type === "file" && typeof item.value === "number" && typeof removed.value === "number" && item.value > removed.value ? { ...item, value: item.value - 1 } : item);
+    setItems(next);
+    if (removed.type === "file" && inputRef.current) {
+      const dataTransfer = new DataTransfer();
+      remainingFiles.forEach((file) => dataTransfer.items.add(file));
+      inputRef.current.files = dataTransfer.files;
+    }
+  }
+
+  function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= items.length) return;
+    const next = [...items];
+    [next[index], next[target]] = [next[target], next[index]];
+    setItems(next);
+  }
+
+  return <div className="md:col-span-2">
+    <label className="text-xs text-zinc-500">Galería · máximo {MAX_PRODUCT_IMAGES} imágenes</label>
+    <input ref={inputRef} name="image" multiple type="file" accept="image/*" required={required && items.length === 0} onChange={(event) => updateFiles(Array.from(event.target.files ?? []))} className="mt-1 block w-full text-xs" />
+    <input type="hidden" name="galleryOrder" value={JSON.stringify(items.map(({ type, value }) => ({ type, value })))} readOnly />
+    {error && <p role="alert" className="mt-2 text-xs text-red-300">{error}</p>}
+    <div className="mt-2 space-y-2">
+      {items.map((item, index) => <div key={`${item.type}-${item.value}`} className="flex items-center gap-2 border border-white/10 bg-black px-2 py-2 text-xs">
+        {item.type === "url" && <div className="relative h-10 w-8 shrink-0 overflow-hidden bg-zinc-900"><Image src={item.label} alt="" fill sizes="32px" className="object-cover" /></div>}
+        <span className="min-w-0 flex-1 truncate">{index + 1}. {item.label}</span>
+        <button type="button" onClick={() => move(index, -1)} disabled={index === 0} aria-label="Move image up" className="p-1 disabled:opacity-30"><ArrowUp size={14} /></button>
+        <button type="button" onClick={() => move(index, 1)} disabled={index === items.length - 1} aria-label="Move image down" className="p-1 disabled:opacity-30"><ArrowDown size={14} /></button>
+        <button type="button" onClick={() => remove(index)} aria-label={`Remove image ${index + 1}`} className="p-1 text-red-300"><X size={14} /></button>
+      </div>)}
+    </div>
+  </div>;
+}
 
 export default function DashboardContent({
   initialCatalog,
@@ -182,7 +242,7 @@ export default function DashboardContent({
     {feedback.message && <div role={feedback.status === "error" ? "alert" : "status"} className={`border p-3 text-sm ${feedback.status === "error" ? "border-red-500/40 text-red-300" : feedback.status === "success" ? "border-emerald-500/40 text-emerald-300" : "border-white/10 text-zinc-300"}`}>{feedback.message}</div>}
 
     {newTeamOpen && <form onSubmit={submitNewTeam} className="grid gap-3 border border-white/10 bg-zinc-900 p-5 md:grid-cols-[1fr_1fr_auto]"><input name="name" required placeholder="Nombre del equipo" className="border border-white/10 bg-black px-3 py-3 text-sm" /><input name="slug" required pattern="[a-z0-9-]+" placeholder="slug-seguro" className="border border-white/10 bg-black px-3 py-3 text-sm" /><button className="bg-white px-4 py-3 text-xs font-bold uppercase text-black">Guardar equipo</button></form>}
-     {newProductOpen && <form onSubmit={submitNewProduct} className="grid gap-4 border border-white/10 bg-zinc-900 p-5 md:grid-cols-2"><input name="id" required placeholder="ID único (ej. boca-buzo-1)" className="border border-white/10 bg-black px-3 py-3 text-sm" /><input name="name" required placeholder="Nombre visible" className="border border-white/10 bg-black px-3 py-3 text-sm" /><input name="year" placeholder="Año / temporada (ej. 2025/26)" className="border border-white/10 bg-black px-3 py-3 text-sm" /><input name="price" required type="number" min="0" step="1" placeholder="Precio" className="border border-white/10 bg-black px-3 py-3 text-sm" /><select name="teamId" required className="border border-white/10 bg-black px-3 py-3 text-sm">{catalog.teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select><input name="category" required defaultValue="Camisetas" placeholder="Categoría / tipo" className="border border-white/10 bg-black px-3 py-3 text-sm" /><input name="sizes" required defaultValue="S, M, L, XL" placeholder="Talles separados por coma" className="border border-white/10 bg-black px-3 py-3 text-sm" /><label className="flex items-center gap-3 border border-white/10 bg-black px-3 py-3 text-sm text-zinc-300 md:col-span-2"><input name="isNew" type="checkbox" className="h-4 w-4 accent-white" />Mostrar en “Recién llegados”</label><label className="border border-white/10 bg-black px-3 py-3 text-sm text-zinc-400 md:col-span-2">Imagen principal<input name="image" required type="file" accept="image/*" className="mt-2 block w-full text-xs" /></label><button className="bg-white px-4 py-3 text-xs font-bold uppercase text-black md:col-span-2">Subir y guardar producto</button></form>}
+     {newProductOpen && <form onSubmit={submitNewProduct} className="grid gap-4 border border-white/10 bg-zinc-900 p-5 md:grid-cols-2"><input name="id" required placeholder="ID único (ej. boca-buzo-1)" className="border border-white/10 bg-black px-3 py-3 text-sm" /><input name="name" required placeholder="Nombre visible" className="border border-white/10 bg-black px-3 py-3 text-sm" /><input name="year" placeholder="Año / temporada (ej. 2025/26)" className="border border-white/10 bg-black px-3 py-3 text-sm" /><input name="price" required type="number" min="0" step="1" placeholder="Precio" className="border border-white/10 bg-black px-3 py-3 text-sm" /><select name="teamId" required className="border border-white/10 bg-black px-3 py-3 text-sm">{catalog.teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select><input name="category" required defaultValue="Camisetas" placeholder="Categoría / tipo" className="border border-white/10 bg-black px-3 py-3 text-sm" /><input name="sizes" required defaultValue="S, M, L, XL" placeholder="Talles separados por coma" className="border border-white/10 bg-black px-3 py-3 text-sm" /><label className="flex items-center gap-3 border border-white/10 bg-black px-3 py-3 text-sm text-zinc-300 md:col-span-2"><input name="isNew" type="checkbox" className="h-4 w-4 accent-white" />Mostrar en “Recién llegados”</label><GalleryEditor gallery={[]} required /><button className="bg-white px-4 py-3 text-xs font-bold uppercase text-black md:col-span-2">Subir y guardar producto</button></form>}
 
     <div className="flex items-center justify-between text-xs text-zinc-500"><span>{filtered.items.length} de {filterCatalogProducts(catalog, query, teamFilter).length} productos</span><span>Página {filtered.currentPage} de {filtered.totalPages}</span></div>
     <div className="space-y-4">{filtered.items.map(({ product, team }) => {
@@ -190,7 +250,7 @@ export default function DashboardContent({
       const isEditing = editingProductId === product.id;
       return <article key={product.id} className="border border-white/10 bg-zinc-900 p-4">
         <div className="flex flex-col gap-4 xl:flex-row">
-          <div className="relative h-36 w-28 shrink-0 overflow-hidden bg-black"><Image src={product.image} alt="" fill sizes="112px" className="object-cover" /></div>
+           <div className="relative h-36 w-28 shrink-0 overflow-hidden bg-black"><Image src={product.image} alt="" fill sizes="112px" className="object-cover" /></div>
           {isEditing ? <form onSubmit={(event) => { event.preventDefault(); void saveProduct(product.id, event.currentTarget); }} className="grid min-w-0 flex-1 gap-3 md:grid-cols-4">
             <div className="md:col-span-2"><label className="text-[10px] uppercase text-zinc-500">Nombre · {product.id}</label><input name="name" required defaultValue={product.name} className="mt-1 w-full border border-white/10 bg-black px-3 py-2 text-sm" /></div>
             <div><label className="text-[10px] uppercase text-zinc-500">Año / temporada</label><input name="year" defaultValue={product.year ?? ""} placeholder="Ej. 2025/26" className="mt-1 w-full border border-white/10 bg-black px-3 py-2 text-sm" /></div>
@@ -199,7 +259,7 @@ export default function DashboardContent({
             <div><label className="text-[10px] uppercase text-zinc-500">Categoría</label><input name="category" required defaultValue={product.category} className="mt-1 w-full border border-white/10 bg-black px-3 py-2 text-sm" /></div>
             <div><label className="text-[10px] uppercase text-zinc-500">Talles</label><input name="sizes" required defaultValue={product.sizes.join(", ")} className="mt-1 w-full border border-white/10 bg-black px-3 py-2 text-sm" /></div>
              <label className="flex items-center gap-3 text-xs text-zinc-400 md:col-span-2"><input name="isNew" type="checkbox" defaultChecked={product.isNew === true} className="h-4 w-4 accent-white" />Mostrar en “Recién llegados”</label>
-             <label className="text-xs text-zinc-500 md:col-span-2">Reemplazar imagen (opcional)<input name="image" type="file" accept="image/*" className="mt-1 block w-full text-xs" /></label>
+                <GalleryEditor gallery={getProductGallery(product)} required />
             <div className="flex items-end gap-2"><button type="submit" className="bg-white px-3 py-2 text-xs font-bold uppercase text-black">Guardar cambios</button><button type="button" onClick={() => setEditingProductId(null)} className="border border-white/20 px-3 py-2 text-xs font-bold uppercase">Cancelar</button></div>
           </form> : <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-bold">{product.name}</h2><p className="text-xs text-zinc-500">{product.id}</p></div><div className="flex gap-2"><button type="button" onClick={() => setEditingProductId(product.id)} aria-label={`Editar ${product.name}`} title={`Editar ${product.name}`} className="border border-white/20 p-2 text-zinc-300 hover:border-white hover:text-white"><Pencil size={16} aria-hidden="true" /></button><button type="button" onClick={() => void deleteProduct(product.id, product.name)} aria-label={`Eliminar ${product.name}`} title={`Eliminar ${product.name}`} className="border border-red-400/40 p-2 text-red-300 hover:border-red-300 hover:text-red-200"><Trash2 size={16} aria-hidden="true" /></button></div></div>

@@ -1,6 +1,7 @@
 import type { Product, Team } from "../../public/camisetas/mock";
 
 export const CATALOG_STATE_VERSION = 1;
+export const MAX_PRODUCT_IMAGES = 4;
 
 export type CatalogState = {
   schemaVersion: 1;
@@ -13,6 +14,31 @@ export type CatalogProductInput = Omit<Product, "hoverImage" | "inStock"> & {
   hoverImage?: string;
   inStock?: boolean;
 };
+
+export function getProductGallery(product: Pick<Product, "image" | "images" | "hoverImage">) {
+  const gallery = Array.isArray(product.images)
+    ? product.images.filter((image): image is string => typeof image === "string" && image.trim().length > 0)
+    : undefined;
+  if (gallery && gallery.length > 0) return gallery;
+  return [product.image, product.hoverImage].filter((image): image is string => typeof image === "string" && image.trim().length > 0);
+}
+
+export function selectUploadedGallery(urls: string[], current: Pick<Product, "image" | "images">) {
+  return urls.length > 0
+    ? { image: urls[0], images: urls }
+    : { image: current.image, ...(current.images ? { images: current.images } : {}) };
+}
+
+export function validateProductGallery(images: string[]) {
+  const normalized = images.map((image) => image.trim()).filter(Boolean);
+  if (normalized.length === 0) {
+    throw new Error("El producto debe tener al menos una imagen.");
+  }
+  if (normalized.length > MAX_PRODUCT_IMAGES) {
+    throw new Error(`Un producto puede tener como máximo ${MAX_PRODUCT_IMAGES} imágenes.`);
+  }
+  return normalized;
+}
 
 export function createCatalogState(teams: Team[]): CatalogState {
   return {
@@ -38,7 +64,7 @@ export function findCatalogTeam(state: CatalogState, teamId: string) {
 export function updateCatalogProduct(
   state: CatalogState,
   productId: string,
-  update: Partial<Pick<Product, "name" | "year" | "isNew" | "price" | "category" | "image" | "hoverImage" | "sizes">> & { teamId?: string },
+  update: Partial<Pick<Product, "name" | "year" | "isNew" | "price" | "category" | "image" | "images" | "hoverImage" | "sizes">> & { teamId?: string },
 ): CatalogState {
   const current = flattenCatalog(state).find(({ product }) => product.id === productId);
   if (!current) throw new Error("El producto no existe en el catálogo público.");

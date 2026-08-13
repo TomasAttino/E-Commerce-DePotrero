@@ -8,6 +8,7 @@ import {
   addCatalogTeam,
   deleteCatalogProduct as removeCatalogProduct,
   updateCatalogProduct,
+  validateProductGallery,
   type CatalogState,
 } from "@/lib/catalog";
 import { readCatalogState, updateCatalogState } from "@/lib/catalog-blob";
@@ -47,6 +48,37 @@ function fileIsImage(file: FormDataEntryValue | null): file is File {
   return file instanceof File && file.size > 0 && file.type.startsWith("image/");
 }
 
+function imageFiles(formData: FormData) {
+  const entries = formData.getAll("image");
+  if (entries.some((entry) => !(entry instanceof File) || (entry.size > 0 && !entry.type.startsWith("image/")))) {
+    throw new Error("Todas las imágenes deben ser archivos válidos.");
+  }
+  const files = entries.filter(fileIsImage);
+  if (files.length > 4) throw new Error("Un producto puede tener como máximo 4 imágenes.");
+  return files;
+}
+
+function galleryOrder(formData: FormData, uploadedImages: string[]) {
+  const value = formData.get("galleryOrder");
+  if (typeof value !== "string" || !value.trim()) return uploadedImages;
+  let entries: Array<{ type: "url" | "file"; value: string | number }>;
+  try {
+    entries = JSON.parse(value);
+  } catch {
+    throw new Error("El orden de la galería no es válido.");
+  }
+  if (!Array.isArray(entries)) throw new Error("El orden de la galería no es válido.");
+  if (entries.length === 0) return validateProductGallery(uploadedImages);
+  const gallery = entries.map((entry) => {
+    if (entry?.type === "url" && typeof entry.value === "string") return entry.value;
+    if (entry?.type === "file" && Number.isInteger(entry.value) && uploadedImages[entry.value as number]) return uploadedImages[entry.value as number];
+    throw new Error("La galería contiene una imagen inválida.");
+  });
+  const validated = validateProductGallery(gallery);
+  if (validated.length === 0) throw new Error("El producto debe tener al menos una imagen.");
+  return validated;
+}
+
 async function uploadImage(file: File) {
   const filename = file.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-");
   return (await put(`camisetas/products/${crypto.randomUUID()}-${filename}`, file, { access: "public" })).url;
@@ -66,8 +98,10 @@ export async function getPanelCatalog() {
 export async function saveCatalogProduct(productId: string, formData: FormData, expectedVersion: number): Promise<CatalogActionResult> {
   await requireAdmin();
   try {
-    const image = formData.get("image");
-    const imageUrl = fileIsImage(image) ? await uploadImage(image) : undefined;
+      const uploadedImages = await Promise.all(imageFiles(formData).map(uploadImage));
+      const hasGalleryOrder = formData.has("galleryOrder");
+      const orderedGallery = hasGalleryOrder ? galleryOrder(formData, uploadedImages) : uploadedImages;
+      if (hasGalleryOrder && orderedGallery.length === 0) throw new Error("El producto debe tener al menos una imagen.");
     const productUpdate = {
       name: text(formData.get("name"), "El nombre"),
       year: optionalText(formData.get("year")),
@@ -76,7 +110,7 @@ export async function saveCatalogProduct(productId: string, formData: FormData, 
       category: text(formData.get("category"), "La categoría"),
       sizes: sizes(formData.get("sizes")),
       isNew: formData.get("isNew") === "on",
-      ...(imageUrl ? { image: imageUrl } : {}),
+       ...(formData.has("galleryOrder") ? { image: orderedGallery[0], images: orderedGallery } : uploadedImages.length > 0 ? { image: uploadedImages[0], images: uploadedImages } : {}),
     };
     const state = await updateCatalogState(expectedVersion, (current) => updateCatalogProduct(current, productId, {
       ...productUpdate,
@@ -123,14 +157,18 @@ export async function createCatalogTeam(formData: FormData, expectedVersion: num
 export async function createCatalogProduct(formData: FormData, expectedVersion: number): Promise<CatalogActionResult> {
   await requireAdmin();
   try {
-    const image = formData.get("image");
-    if (!fileIsImage(image)) throw new Error("La imagen principal es obligatoria y debe ser válida.");
+      const images = imageFiles(formData);
+      if (images.length === 0) throw new Error("La imagen principal es obligatoria y debe ser válida.");
+      const imageUrls = await Promise.all(images.map(uploadImage));
+      const orderedGallery = galleryOrder(formData, imageUrls);
+      if (orderedGallery.length === 0) throw new Error("El producto debe tener al menos una imagen.");
     const product = {
       id: text(formData.get("id"), "El ID"),
       name: text(formData.get("name"), "El nombre"),
       year: optionalText(formData.get("year")),
       price: positivePrice(formData.get("price")),
-      image: await uploadImage(image),
+       image: orderedGallery[0],
+       images: orderedGallery,
       sizes: sizes(formData.get("sizes")),
       category: text(formData.get("category"), "La categoría"),
       isNew: formData.get("isNew") === "on",

@@ -6,9 +6,13 @@ import {
   createCatalogState,
   deleteCatalogProduct,
   filterCatalogProducts,
+  getProductGallery,
   paginate,
   selectNewCatalogProducts,
   updateCatalogProduct,
+  selectUploadedGallery,
+  validateProductGallery,
+  MAX_PRODUCT_IMAGES,
 } from "./catalog.ts";
 import { emptyStockState, resolveProductStock, toggleProductSize } from "./stock.ts";
 import { isStateVersionBehind } from "./blob-version.ts";
@@ -38,6 +42,15 @@ const newProduct = {
   inStock: true,
   isNew: true,
 };
+assert.deepEqual(getProductGallery(newProduct), [newProduct.image]);
+assert.deepEqual(getProductGallery({ ...newProduct, hoverImage: "hover.png" }), [newProduct.image, "hover.png"]);
+assert.deepEqual(getProductGallery({ ...newProduct, images: ["one.png", "two.png"], hoverImage: "legacy.png" }), ["one.png", "two.png"]);
+assert.deepEqual(selectUploadedGallery(["new-1.png", "new-2.png"], newProduct), { image: "new-1.png", images: ["new-1.png", "new-2.png"] });
+assert.deepEqual(selectUploadedGallery([], { image: "old.png", images: ["old.png", "old-2.png"] }), { image: "old.png", images: ["old.png", "old-2.png"] });
+assert.equal(MAX_PRODUCT_IMAGES, 4);
+assert.deepEqual(validateProductGallery([" third.png ", "first.png", "second.png"]), ["third.png", "first.png", "second.png"]);
+assert.throws(() => validateProductGallery([]), /al menos una imagen/);
+assert.throws(() => validateProductGallery(["1", "2", "3", "4", "5"]), /4 imágenes/);
 const withProduct = addCatalogProduct(withTeam, "nuevo-equipo", newProduct);
 assert.equal(withProduct.teams.find((team) => team.id === "nuevo-equipo")?.products[0].isNew, true);
 const edited = updateCatalogProduct(withProduct, newProduct.id, { name: "Buzo Editado", year: "2026", price: 35000, isNew: false, teamId: "boca" });

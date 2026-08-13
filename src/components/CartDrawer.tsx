@@ -8,8 +8,8 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean, onClo
 
   const handleWhatsAppOrder = () => {
     const phoneNumber = "5491137684212";
-    const message = cart.map(item => 
-      `- ${item.name} (${item.quantity}x) | Talle: ${item.selectedSize} }`
+    const message = cart.map(item =>
+      `- Código: ${item.id} | ${item.name} (${item.quantity}x) | Talle: ${item.selectedSize}`
     ).join('\n');
     const total = `Total: $${totalPrice.toLocaleString('es-AR')}`;
     const encodedMessage = encodeURIComponent(`¡Hola! Me gustaría encargar:\n\n${message}\n\n${total}`);
@@ -43,6 +43,9 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean, onClo
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold truncate text-white">{item.name}</h3>
+                  <p className="text-[10px] uppercase tracking-widest text-lime-400">
+                    Código: {item.id}
+                  </p>
                   <p className="text-xs text-zinc-500 uppercase tracking-widest mt-1">
                     Talle: {item.selectedSize}
                   </p>
