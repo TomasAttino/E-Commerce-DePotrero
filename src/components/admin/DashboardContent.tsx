@@ -16,6 +16,7 @@ type GalleryItem = { type: "url" | "file"; value: string | number; label: string
 const MAX_GALLERY_UPLOAD_BYTES = 16 * 1024 * 1024;
 const IMAGE_PREPARATION_THRESHOLD = 2 * 1024 * 1024;
 const MAX_IMAGE_DIMENSION = 2400;
+const pendingGalleryPreparations = new WeakMap<HTMLFormElement, Promise<void>>();
 
 async function prepareImage(file: File) {
   if (file.type === "image/svg+xml" || file.size <= IMAGE_PREPARATION_THRESHOLD) return file;
@@ -51,7 +52,18 @@ function GalleryEditor({ gallery, required = false }: { gallery: string[]; requi
       setError(`Un producto puede tener como máximo ${MAX_PRODUCT_IMAGES} imágenes.`);
       return;
     }
-    const preparedFiles = await Promise.all(files.map(prepareImage));
+    const form = inputRef.current?.form;
+    const preparation = Promise.all(files.map(prepareImage));
+    const preparationBarrier = preparation.then(() => undefined);
+    if (form) {
+      pendingGalleryPreparations.set(form, preparationBarrier);
+      form.querySelectorAll<HTMLButtonElement>("button[type=submit], button:not([type])").forEach((button) => button.setAttribute("disabled", ""));
+    }
+    const preparedFiles = await preparation;
+    if (form && pendingGalleryPreparations.get(form) === preparationBarrier) {
+      pendingGalleryPreparations.delete(form);
+      form.querySelectorAll<HTMLButtonElement>("button[type=submit], button:not([type])").forEach((button) => button.removeAttribute("disabled"));
+    }
     const nextFiles = [...currentFiles, ...preparedFiles];
     if (nextFiles.reduce((total, file) => total + file.size, 0) > MAX_GALLERY_UPLOAD_BYTES) {
       setError("Las imágenes seleccionadas superan el límite de 16 MB. Elegí archivos más chicos.");
@@ -170,12 +182,13 @@ export default function DashboardContent({
   }
 
   async function saveProduct(productId: string, form: HTMLFormElement) {
-    const submittedData = new FormData(form);
     if (savingProductIds.current.has(productId)) return;
     savingProductIds.current.add(productId);
     const submitButton = form.querySelector("button[type=submit], button:not([type])") as HTMLButtonElement | null;
     submitButton?.setAttribute("disabled", "");
     try {
+      await (pendingGalleryPreparations.get(form) ?? Promise.resolve());
+      const submittedData = new FormData(form);
       const result = await enqueueCatalogMutation(async (version) => {
         show({ status: "pending", message: "Guardando producto..." });
         return saveCatalogProduct(productId, submittedData, version);
@@ -219,6 +232,7 @@ export default function DashboardContent({
   async function submitNewProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
+    await (pendingGalleryPreparations.get(form) ?? Promise.resolve());
     const submittedData = new FormData(form);
     const result = await enqueueCatalogMutation(async (version) => {
       show({ status: "pending", message: "Subiendo imagen y guardando producto..." });
