@@ -44,16 +44,29 @@ async function prepareImage(file: File) {
 function GalleryEditor({ gallery, required = false }: { gallery: string[]; required?: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<GalleryItem[]>(gallery.map((url) => ({ type: "url", value: url, label: url })));
+  const filesRef = useRef<File[]>([]);
+  const fileSignaturesRef = useRef<string[]>([]);
   const [error, setError] = useState("");
 
+  function getFileSignature(file: File) {
+    return [file.name, file.size, file.lastModified, file.type].join("\u0000");
+  }
+
   async function updateFiles(files: File[]) {
-    const currentFiles = Array.from(inputRef.current?.files ?? []);
-    if (items.length + files.length > MAX_PRODUCT_IMAGES) {
+    const currentFiles = filesRef.current;
+    const currentSignatures = new Set(fileSignaturesRef.current);
+    const newFiles = files.filter((file) => {
+      const signature = getFileSignature(file);
+      if (currentSignatures.has(signature)) return false;
+      currentSignatures.add(signature);
+      return true;
+    });
+    if (items.length + newFiles.length > MAX_PRODUCT_IMAGES) {
       setError(`Un producto puede tener como máximo ${MAX_PRODUCT_IMAGES} imágenes.`);
       return;
     }
     const form = inputRef.current?.form;
-    const preparation = Promise.all(files.map(prepareImage));
+    const preparation = Promise.all(newFiles.map(prepareImage));
     const preparationBarrier = preparation.then(() => undefined);
     if (form) {
       pendingGalleryPreparations.set(form, preparationBarrier);
@@ -71,6 +84,8 @@ function GalleryEditor({ gallery, required = false }: { gallery: string[]; requi
     }
     const next = [...items, ...preparedFiles.map((file, index) => ({ type: "file" as const, value: currentFiles.length + index, label: file.name }))];
     setItems(next);
+    filesRef.current = nextFiles;
+    fileSignaturesRef.current = [...fileSignaturesRef.current, ...newFiles.map(getFileSignature)];
     setError("");
     if (inputRef.current) {
       const dataTransfer = new DataTransfer();
@@ -81,9 +96,17 @@ function GalleryEditor({ gallery, required = false }: { gallery: string[]; requi
 
   function remove(index: number) {
     const removed = items[index];
-    const remainingFiles = Array.from(inputRef.current?.files ?? []).filter((_, fileIndex) => fileIndex !== removed.value);
+    if (!removed) return;
+    const remainingFiles = removed.type === "file" && typeof removed.value === "number"
+      ? filesRef.current.filter((_, fileIndex) => fileIndex !== removed.value)
+      : filesRef.current;
+    const remainingSignatures = removed.type === "file" && typeof removed.value === "number"
+      ? fileSignaturesRef.current.filter((_, fileIndex) => fileIndex !== removed.value)
+      : fileSignaturesRef.current;
     const next = items.filter((_, itemIndex) => itemIndex !== index).map((item) => item.type === "file" && typeof item.value === "number" && typeof removed.value === "number" && item.value > removed.value ? { ...item, value: item.value - 1 } : item);
     setItems(next);
+    filesRef.current = remainingFiles;
+    fileSignaturesRef.current = remainingSignatures;
     if (removed.type === "file" && inputRef.current) {
       const dataTransfer = new DataTransfer();
       remainingFiles.forEach((file) => dataTransfer.items.add(file));
@@ -101,7 +124,7 @@ function GalleryEditor({ gallery, required = false }: { gallery: string[]; requi
 
   return <div className="md:col-span-2">
     <label className="text-xs text-zinc-500">Galería · máximo {MAX_PRODUCT_IMAGES} imágenes</label>
-    <input ref={inputRef} name="image" multiple type="file" accept="image/*" required={required && items.length === 0} onChange={(event) => updateFiles(Array.from(event.target.files ?? []))} className="mt-1 block w-full text-xs" />
+    <input ref={inputRef} name="image" multiple type="file" accept="image/*" required={required && items.length === 0} onChange={(event) => { const files = Array.from(event.target.files ?? []); event.currentTarget.value = ""; void updateFiles(files); }} className="mt-1 block w-full text-xs" />
     <input type="hidden" name="galleryOrder" value={JSON.stringify(items.map(({ type, value }) => ({ type, value })))} readOnly />
     {error && <p role="alert" className="mt-2 text-xs text-red-300">{error}</p>}
     <div className="mt-2 space-y-2">

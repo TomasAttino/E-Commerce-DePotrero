@@ -11,7 +11,7 @@ import {
   validateProductGallery,
   type CatalogState,
 } from "@/lib/catalog";
-import { readCatalogState, updateCatalogState } from "@/lib/catalog-blob";
+import { confirmCatalogVersion, readCatalogState, updateCatalogState } from "@/lib/catalog-blob";
 
 export type CatalogActionResult =
   | { status: "success"; message: string; state: CatalogState }
@@ -159,6 +159,7 @@ export async function createCatalogProduct(formData: FormData, expectedVersion: 
   try {
       const images = imageFiles(formData);
       if (images.length === 0) throw new Error("La imagen principal es obligatoria y debe ser válida.");
+      await confirmCatalogVersion(expectedVersion);
       const imageUrls = await Promise.all(images.map(uploadImage));
       const orderedGallery = galleryOrder(formData, imageUrls);
       if (orderedGallery.length === 0) throw new Error("El producto debe tener al menos una imagen.");

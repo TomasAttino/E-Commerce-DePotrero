@@ -14,6 +14,14 @@ import { CATALOG_STATE_VERSION, createCatalogState, type CatalogState } from "@/
 import { isStateVersionBehind } from "@/lib/blob-version";
 
 export const CATALOG_BLOB_PATH = "camisetas/catalog/state-v1.json";
+const CATALOG_READ_RETRIES = 3;
+
+class CatalogReadConsistencyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CatalogReadConsistencyError";
+  }
+}
 
 let writeQueue = Promise.resolve();
 
@@ -33,7 +41,7 @@ function parseCatalogState(value: unknown): CatalogState {
   return candidate as CatalogState;
 }
 
-async function readCatalogDocument(): Promise<{ state: CatalogState; etag?: string }> {
+async function readCatalogDocumentOnce(): Promise<{ state: CatalogState; etag?: string }> {
   const token = getBlobToken();
 
   try {
@@ -41,13 +49,27 @@ async function readCatalogDocument(): Promise<{ state: CatalogState; etag?: stri
     const url = new URL(metadata.url);
     url.searchParams.set("etag", metadata.etag);
     const response = await fetch(url, { cache: "no-store" });
-    if (response.status === 404) return { state: createCatalogState(teamsMock) };
+    if (response.status === 404) throw new CatalogReadConsistencyError("public-read-missing");
     if (response.status === 401 || response.status === 403) {
       throw new Error("No se pudo leer el Blob del catálogo por falta de permisos.");
     }
     if (!response.ok) throw new Error("public-read-failed");
-    return { state: parseCatalogState(await response.json()), etag: metadata.etag };
+    const state = parseCatalogState(await response.json());
+    const responseEtag = response.headers.get("etag");
+    if (responseEtag && responseEtag.replace(/^W\//, "") !== metadata.etag.replace(/^W\//, "")) {
+      throw new CatalogReadConsistencyError("public-read-etag-mismatch");
+    }
+    let currentMetadata: Awaited<ReturnType<typeof head>>;
+    try {
+      currentMetadata = await head(CATALOG_BLOB_PATH, { token });
+    } catch (error) {
+      if (error instanceof BlobNotFoundError) throw new CatalogReadConsistencyError("head-missing-after-read");
+      throw error;
+    }
+    if (currentMetadata.etag !== metadata.etag) throw new CatalogReadConsistencyError("head-changed-during-read");
+    return { state, etag: metadata.etag };
   } catch (error) {
+    if (error instanceof CatalogReadConsistencyError) throw error;
     if (error instanceof BlobNotFoundError) return { state: createCatalogState(teamsMock) };
     if (error instanceof Error && error.message === "No se pudo leer el Blob del catálogo por falta de permisos.") {
       throw error;
@@ -73,8 +95,26 @@ async function readCatalogDocument(): Promise<{ state: CatalogState; etag?: stri
   }
 }
 
+async function readCatalogDocument(minVersion?: number): Promise<{ state: CatalogState; etag?: string }> {
+  let document: { state: CatalogState; etag?: string } | undefined;
+  for (let attempt = 0; attempt < CATALOG_READ_RETRIES; attempt += 1) {
+    try {
+      document = await readCatalogDocumentOnce();
+      if (minVersion === undefined || !isStateVersionBehind(document.state.version, minVersion)) return document;
+    } catch (error) {
+      if (!(error instanceof CatalogReadConsistencyError)) throw error;
+    }
+    if (attempt < CATALOG_READ_RETRIES - 1) await new Promise((resolve) => setTimeout(resolve, 100 * (attempt + 1)));
+  }
+  throw new Error("No se pudo confirmar la versión actual del catálogo. Es un problema transitorio de consistencia; intentá nuevamente.");
+}
+
 export async function readCatalogState() {
   return (await readCatalogDocument()).state;
+}
+
+export async function confirmCatalogVersion(expectedVersion: number) {
+  return (await readCatalogDocument(expectedVersion)).state;
 }
 
 async function writeCatalogState(state: CatalogState, etag?: string) {
@@ -93,12 +133,9 @@ export async function updateCatalogState(expectedVersion: number, update: (state
   const operation = writeQueue.then(async () => {
     let preconditionError: BlobPreconditionFailedError | undefined;
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const { state: current, etag } = await readCatalogDocument();
+      const { state: current, etag } = await readCatalogDocument(expectedVersion);
       if (isStateVersionBehind(current.version, expectedVersion)) {
-        if (attempt === 0) continue;
-        throw new Error(
-          "No se pudo confirmar la versión actual del catálogo. Es un problema transitorio de consistencia; intentá nuevamente.",
-        );
+        throw new Error("No se pudo confirmar la versión actual del catálogo. Es un problema transitorio de consistencia; intentá nuevamente.");
       }
       if (attempt === 0 && current.version !== expectedVersion) continue;
       const next = update(current);

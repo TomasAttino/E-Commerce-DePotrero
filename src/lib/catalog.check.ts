@@ -48,6 +48,8 @@ assert.deepEqual(getProductGallery({ ...newProduct, images: ["one.png", "two.png
 assert.deepEqual(selectUploadedGallery(["new-1.png", "new-2.png"], newProduct), { image: "new-1.png", images: ["new-1.png", "new-2.png"] });
 assert.deepEqual(selectUploadedGallery([], { image: "old.png", images: ["old.png", "old-2.png"] }), { image: "old.png", images: ["old.png", "old-2.png"] });
 assert.equal(MAX_PRODUCT_IMAGES, 4);
+const selectedFiles = ["one.jpg", "two.jpg", "three.jpg", "four.jpg"];
+assert.equal(selectedFiles.length, MAX_PRODUCT_IMAGES);
 assert.deepEqual(validateProductGallery([" third.png ", "first.png", "second.png"]), ["third.png", "first.png", "second.png"]);
 assert.throws(() => validateProductGallery([]), /al menos una imagen/);
 assert.throws(() => validateProductGallery(["1", "2", "3", "4", "5"]), /4 imágenes/);
