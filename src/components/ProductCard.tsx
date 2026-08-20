@@ -42,6 +42,11 @@ export default function ProductCard({ product, teamName }: { product: ProductWit
           loading="lazy"
           className="object-cover transition-transform duration-500 group-hover/card:scale-110"
         />
+        {product.isNew && (
+          <div className="absolute left-2 top-2 z-20 bg-lime-400 px-1.5 py-1 text-[9px] font-black uppercase tracking-wider text-black sm:left-4 sm:top-4">
+            Nuevo
+          </div>
+        )}
         {hasGallery && <>
           <button type="button" onClick={() => changeImage(-1)} aria-label={`Imagen anterior de ${product.name}`} className="absolute left-2 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/60 px-2 py-1 text-lg text-white hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-white">‹</button>
           <button type="button" onClick={() => changeImage(1)} aria-label={`Imagen siguiente de ${product.name}`} className="absolute right-2 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/60 px-2 py-1 text-lg text-white hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-white">›</button>

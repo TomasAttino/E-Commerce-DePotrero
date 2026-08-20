@@ -6,13 +6,14 @@ import PromoBar from "@/components/PromoBar";
 import ProductCard from "@/components/ProductCard";
 import CartDrawer from "@/components/CartDrawer";
 import WhatsAppButton from "@/components/WhatsAppButton";
-import { selectNewCatalogProducts } from "@/lib/catalog";
+import { paginate, selectNewCatalogProducts } from "@/lib/catalog";
 import type { TeamWithStock } from "@/lib/stock";
 import Image from "next/image";
 import { SlidersHorizontal } from "lucide-react";
 
 type CatalogProduct = TeamWithStock["products"][number] & { teamName: string; teamSlug: string };
 const PRODUCTS_PER_PAGE = 24;
+const NEW_PRODUCTS_PER_PAGE = 6;
 
 export default function CatalogContent({
   teams,
@@ -28,6 +29,7 @@ export default function CatalogContent({
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [includeSoldOut, setIncludeSoldOut] = useState(true);
   const [page, setPage] = useState(1);
+  const [newProductsPage, setNewProductsPage] = useState(1);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
   const products = useMemo<CatalogProduct[]>(
@@ -48,11 +50,15 @@ export default function CatalogContent({
   );
   const categories = useMemo(() => [...new Set(products.map((product) => product.category))].sort(), [products]);
   const newProducts = useMemo(() => selectNewCatalogProducts(products), [products]);
+  const paginatedNewProducts = useMemo(
+    () => paginate(newProducts, newProductsPage, NEW_PRODUCTS_PER_PAGE),
+    [newProducts, newProductsPage],
+  );
   const sizes = useMemo(() => [...new Set(products.flatMap((product) => product.sizes))].sort(), [products]);
   const filteredProducts = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return products.filter((product) => {
+    const filtered = products.filter((product) => {
       const matchesQuery = !normalizedQuery || [product.teamName, product.name, product.id]
         .some((value) => value.toLowerCase().includes(normalizedQuery));
       const matchesTeam = teamFilter === "all" || product.teamSlug === teamFilter;
@@ -63,12 +69,23 @@ export default function CatalogContent({
       const matchesStock = includeSoldOut || !product.stockVerified || product.inStock;
       return matchesQuery && matchesTeam && matchesCategory && matchesSizes && matchesStock;
     });
+
+    return teamFilter === "all"
+      ? filtered
+      : [
+        ...filtered.filter((product) => product.isNew === true),
+        ...filtered.filter((product) => product.isNew !== true),
+      ];
   }, [categoryFilter, includeSoldOut, products, query, selectedSizes, teamFilter]);
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE));
   const currentPage = Math.min(page, totalPages);
   const visibleProducts = filteredProducts.slice((currentPage - 1) * PRODUCTS_PER_PAGE, currentPage * PRODUCTS_PER_PAGE);
 
   const resetPage = () => setPage(1);
+  const handleTeamChange = (teamSlug: string) => {
+    setTeamFilter(teamSlug);
+    resetPage();
+  };
 
   const toggleSize = (size: string) => {
     setSelectedSizes((current) => current.includes(size)
@@ -83,7 +100,7 @@ export default function CatalogContent({
          onCartClick={() => setIsCartOpen(true)}
          teamOptions={teams}
          selectedTeam={teamFilter}
-         onTeamSelect={(teamSlug) => { setTeamFilter(teamSlug); resetPage(); }}
+          onTeamSelect={handleTeamChange}
        />
       <section className="mx-auto max-w-7xl px-4 pb-16 pt-32 sm:px-6 lg:px-8" aria-labelledby="catalog-title">
         {catalogFallback && <div role="status" className="mb-8 border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-center text-xs text-amber-200">Se está mostrando la colección inicial por el momento.</div>}
@@ -93,15 +110,20 @@ export default function CatalogContent({
          <p className="mt-4 text-sm text-zinc-400 sm:text-base">Encontrá camisetas y próximos productos de todos los equipos en un solo lugar.</p>
          </div>
 
-         {newProducts.length > 0 && <section className="mb-12 border border-lime-400/30 bg-lime-400/5 p-4 sm:p-6" aria-labelledby="new-products-title">
+          {teamFilter === "all" && newProducts.length > 0 && <section className="mb-12 border border-lime-400/30 bg-lime-400/5 p-4 sm:p-6" aria-labelledby="new-products-title">
            <div className="mb-5 flex items-end justify-between gap-4">
              <div><p className="mb-2 text-xs font-bold uppercase tracking-[0.3em] text-lime-300">Lo último</p><h2 id="new-products-title" className="text-2xl font-black uppercase italic tracking-tight sm:text-4xl">Recién llegados</h2></div>
              <span className="text-xs text-zinc-400">{newProducts.length} {newProducts.length === 1 ? "producto" : "productos"}</span>
-           </div>
-           <div className="grid grid-cols-2 gap-3 md:grid-cols-2 md:gap-6 lg:grid-cols-3 xl:grid-cols-4" role="region" aria-label="Productos recién llegados">
-             {newProducts.map((product) => <div key={product.id} className="min-w-0"><ProductCard product={product} teamName={product.teamName} /></div>)}
-           </div>
-         </section>}
+            </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-2 md:gap-6 lg:grid-cols-3 xl:grid-cols-4" role="region" aria-label="Productos recién llegados">
+              {paginatedNewProducts.items.map((product) => <div key={product.id} className="min-w-0"><ProductCard product={product} teamName={product.teamName} /></div>)}
+            </div>
+            {paginatedNewProducts.totalPages > 1 && <nav className="mt-8 flex flex-wrap items-center justify-center gap-2" aria-label="Paginación de recién llegados">
+              <button type="button" onClick={() => setNewProductsPage(paginatedNewProducts.currentPage - 1)} disabled={paginatedNewProducts.currentPage === 1} className="border border-white/15 px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors hover:border-white disabled:cursor-not-allowed disabled:opacity-30">Anterior</button>
+              <span className="px-2 text-xs text-zinc-400" aria-live="polite">Página {paginatedNewProducts.currentPage} de {paginatedNewProducts.totalPages}</span>
+              <button type="button" onClick={() => setNewProductsPage(paginatedNewProducts.currentPage + 1)} disabled={paginatedNewProducts.currentPage === paginatedNewProducts.totalPages} className="border border-white/15 px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors hover:border-white disabled:cursor-not-allowed disabled:opacity-30">Siguiente</button>
+            </nav>}
+          </section>}
 
           <button
            type="button"
@@ -129,7 +151,7 @@ export default function CatalogContent({
             </div>
             <div>
               <label htmlFor="catalog-team" className="mb-2 block text-xs font-bold uppercase tracking-widest text-zinc-400">Equipo</label>
-               <select id="catalog-team" value={teamFilter} onChange={(event) => { setTeamFilter(event.target.value); resetPage(); }} className="w-full border border-white/15 bg-zinc-950 px-4 py-3 text-sm text-white outline-none focus-visible:border-white">
+                <select id="catalog-team" value={teamFilter} onChange={(event) => handleTeamChange(event.target.value)} className="w-full border border-white/15 bg-zinc-950 px-4 py-3 text-sm text-white outline-none focus-visible:border-white">
                 <option value="all">Todos los equipos</option>
                 {teams.map((team) => <option key={team.slug} value={team.slug}>{team.name}</option>)}
               </select>

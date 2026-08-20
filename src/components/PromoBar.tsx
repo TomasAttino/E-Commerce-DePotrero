@@ -1,7 +1,8 @@
 const messages = [
   "Envíos a todo el país",
-  "Medios de pago",
+  "10% de descuento en tu primera compra",
   "Camisetas retro",
+  "Elegi tu camiseta favorita",
 ];
 
 export default function PromoBar() {
@@ -11,9 +12,9 @@ export default function PromoBar() {
         {[0, 1].map((group) => (
           <div key={group} className="flex shrink-0 items-center" aria-hidden="true">
             {messages.map((message) => (
-              <span key={`${group}-${message}`} className="px-5 whitespace-nowrap sm:px-8">
+              <span key={`${group}-${message}`} className="px-5 whitespace-nowrap sm:px-12">
                 {message}
-                <span className="ml-5 text-lime-400/80 sm:ml-8" aria-hidden="true">•</span>
+                <span className="ml-5 text-lime-400/80 sm:ml-8" aria-hidden="true"></span>
               </span>
             ))}
           </div>

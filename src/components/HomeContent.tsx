@@ -61,7 +61,7 @@ export default function HomeContent({ teams, catalogFallback }: { teams: TeamWit
       </a>
 
       <a
-        href="#productos"
+        href="/catalogo"
         className="text-zinc-400 transition hover:text-lime-400"
       >
         Camisetas
