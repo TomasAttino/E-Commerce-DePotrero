@@ -10,7 +10,7 @@ const russoOne = Russo_One({
 });
 
 export const metadata: Metadata = {
-  title: "Camisetas - Muy pronto",
+  title: "DePotrero",
   description: "Tienda online de camisetas de alta calidad",
 };
 
