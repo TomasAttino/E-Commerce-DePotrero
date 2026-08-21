@@ -12,6 +12,11 @@ const russoOne = Russo_One({
 export const metadata: Metadata = {
   title: "DePotrero",
   description: "Tienda online de camisetas de alta calidad",
+  icons: {
+    icon: "/isologo2.png",
+    shortcut: "/isologo2.png",
+    apple: "/isologo2.png",
+  },
 };
 
 export default function RootLayout({
